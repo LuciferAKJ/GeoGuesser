@@ -42,3 +42,5 @@ node_modules/
 
 # JVM crash logs
 hs_err_pid*
+
+backend/src/main/resources/application-local.properties
