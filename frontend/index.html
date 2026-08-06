@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GeoGuesser</title>
+
+  <!-- Leaflet for the clickable world map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- ── AUTH SCREEN ─────────────────────────────────── -->
+<div id="auth-screen" class="screen center">
+  <div class="card">
+    <h1>🌍 GeoGuesser</h1>
+    <p class="sub">How well do you know the world?</p>
+
+    <div id="login-form" class="form-section">
+      <input id="l-user" type="text" placeholder="Username"/>
+      <input id="l-pass" type="password" placeholder="Password"/>
+      <button class="btn-primary" onclick="login()">Login</button>
+      <button class="btn-ghost" onclick="showRegister()">Create Account</button>
+      <p class="msg" id="l-msg"></p>
+    </div>
+
+    <div id="register-form" class="form-section" style="display:none">
+      <input id="r-user" type="text" placeholder="Username"/>
+      <input id="r-email" type="email" placeholder="Email"/>
+      <input id="r-pass" type="password" placeholder="Password"/>
+      <button class="btn-primary" onclick="register()">Register</button>
+      <button class="btn-ghost" onclick="showLogin()">← Back to Login</button>
+      <p class="msg" id="r-msg"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ── GAME SCREEN ─────────────────────────────────── -->
+<div id="game-screen" class="screen" style="display:none; flex-direction:column;">
+
+  <nav>
+    <span class="brand">🌍 GeoGuesser</span>
+    <div class="nav-center">
+      <span class="timer-badge">⏱ <span id="timer">0s</span></span>
+      <span class="round-badge">Round <span id="round-num">1</span> / 5</span>
+      <span class="score-badge">Score: <span id="running-score">0</span></span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-sm" onclick="showLeaderboard()">🏆</button>
+      <button class="btn-sm" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="game-body">
+
+    <div class="image-panel">
+      <div id="img-loader" class="loader-overlay">
+        <div class="spinner"></div>
+        <span>Loading location...</span>
+      </div>
+      <img id="location-img" src="" alt="Guess this location" style="display:none"/>
+
+      <div id="result-ribbon" style="display:none">
+        <span id="result-label"></span>
+        &nbsp;·&nbsp;
+        <b id="result-place"></b>
+        &nbsp;·&nbsp;
+        📏 <b id="result-dist"></b>
+        &nbsp;·&nbsp;
+        ⭐ <b id="result-score"></b>
+      </div>
+    </div>
+
+    <div class="map-panel">
+      <div id="world-map"></div>
+
+      <div class="map-controls">
+        <div id="pin-hint" class="hint-badge">📍 Click on the map to place your guess</div>
+        <button class="btn-primary guess-btn" id="guess-btn" onclick="submitGuess()" disabled>
+          Submit Guess
+        </button>
+        <button class="btn-ghost next-btn" id="next-btn" onclick="nextRound()" style="display:none">
+          Next Location →
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="final-overlay" style="display:none">
+    <div class="final-card">
+      <div class="final-emoji">🎉</div>
+      <h2>Game Over!</h2>
+      <div class="final-score"><span id="final-score-val">0</span> / 25,000</div>
+      <div id="final-grade"></div>
+      <button class="btn-primary" style="width:200px" onclick="startGame()">Play Again</button>
+      <button class="btn-ghost" style="width:200px" onclick="showLeaderboard()">🏆 Leaderboard</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── LEADERBOARD ──────────────────────────────────── -->
+<div id="lb-screen" class="screen center" style="display:none">
+  <div class="card" style="width:620px">
+    <h2>🏆 Global Leaderboard</h2>
+    <table id="lb-table">
+      <thead><tr><th>#</th><th>Player</th><th>Total Score</th><th>Best</th><th>Games</th></tr></thead>
+      <tbody id="lb-body"></tbody>
+    </table>
+    <button class="btn-ghost" style="margin-top:20px" onclick="showGame()">← Back</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+# Maven
+target/
+**/target/
+
+# IntelliJ
+.idea/
+
+# VS Code
+.vscode/
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Compiled Java
+*.class
+
+# Maven wrapper
+.mvn/wrapper/maven-wrapper.jar
+
+# Environment
+.env
+.env.*
+
+# Secrets
+application-local.properties
+
+# Node (future)
+node_modules/
+
+# Mac
+.AppleDouble
+.LSOverride
+
+# JVM crash logs
+hs_err_pid*
