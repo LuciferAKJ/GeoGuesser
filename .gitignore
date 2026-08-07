@@ -31,7 +31,7 @@ Thumbs.db
 .env.*
 
 # Secrets
-application-local.properties
+**/application-local.properties
 
 # Node (future)
 node_modules/

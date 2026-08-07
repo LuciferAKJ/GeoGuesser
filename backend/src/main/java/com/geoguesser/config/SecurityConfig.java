@@ -12,6 +12,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfigurationSource;
 
 @Configuration
 public class SecurityConfig {
@@ -28,17 +29,21 @@ public class SecurityConfig {
             JwtFilter jwtFilter
     ) throws Exception {
 
-        http.csrf(csrf -> csrf.disable())
+        http
+            .cors(cors -> {})
+            .csrf(csrf -> csrf.disable())
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
-        "/api/auth/**",
-                    "/api/location/**",
-                    "/api/player/leaderboard",
-                    "/api/game/**"
+                        "/api/auth/**",
+                        "/api/location/random",
+                        "/api/location/daily",
+                        "/api/location/batch",
+                        "/api/player/leaderboard"
                 ).permitAll()
+                .anyRequest().authenticated()
             )
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -47,13 +52,13 @@ public class SecurityConfig {
 
     @Bean
     public UserDetailsService userDetailsService() {
-        return username -> playerRepository.findByUsername(username)
+        return username -> playerRepository.findByUsernameIgnoreCase(username)
             .map(p -> (UserDetails) User.withUsername(p.getUsername())
                     .password(p.getPasswordHash())
                     .roles("USER")
                     .build())
             .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
-}
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {

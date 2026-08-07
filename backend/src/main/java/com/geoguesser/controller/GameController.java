@@ -3,9 +3,11 @@ package com.geoguesser.controller;
 import com.geoguesser.dto.GuessRequest;
 import com.geoguesser.dto.GuessResult;
 import com.geoguesser.service.GameService;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/game")
@@ -19,14 +21,16 @@ public class GameController {
 
     @PostMapping("/guess")
     public ResponseEntity<GuessResult> guess(
-            @RequestParam Long playerId,
+            @AuthenticationPrincipal UserDetails user,
             @Valid @RequestBody GuessRequest req) {
 
-        return ResponseEntity.ok(gameService.processGuess(playerId, req));
+        return ResponseEntity.ok(
+                gameService.processGuess(user.getUsername(), req)
+        );
     }
 
     @GetMapping("/history")
-    public ResponseEntity<?> history(@RequestParam Long playerId) {
-        return ResponseEntity.ok(gameService.getRecentGames(playerId));
+    public ResponseEntity<?> history(@AuthenticationPrincipal UserDetails user) {
+        return ResponseEntity.ok(gameService.getRecentGames(user.getUsername()));
     }
 }

@@ -1,77 +1,65 @@
 package com.geoguesser.service;
 
+import com.geoguesser.dto.LeaderboardDTO;
+import com.geoguesser.dto.PlayerStatsDTO;
 import com.geoguesser.model.Player;
 import com.geoguesser.repository.PlayerRepository;
-import com.geoguesser.config.JwtUtil;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class PlayerService {
 
     private final PlayerRepository playerRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtUtil jwtUtil;
 
-    public PlayerService(PlayerRepository playerRepository,
-                         PasswordEncoder passwordEncoder,
-                         JwtUtil jwtUtil) {
+    public PlayerService(PlayerRepository playerRepository) {
         this.playerRepository = playerRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtUtil = jwtUtil;
     }
 
-    public Player register(String username, String email, String password) {
-        if (playerRepository.existsByUsername(username))
-            throw new RuntimeException("Username already taken");
+    @Transactional
+    public void updatePlayerStatistics(Player player, int finalScore) {
+        player.setGamesPlayed(player.getGamesPlayed() + 1);
+        player.setTotalScore(player.getTotalScore() + finalScore);
 
-        if (playerRepository.existsByEmail(email))
-            throw new RuntimeException("Email already registered");
+        if (finalScore > player.getBestScore()) {
+            player.setBestScore(finalScore);
+        }
 
-        Player p = new Player(username, email, passwordEncoder.encode(password));
-        return playerRepository.save(p);
+        playerRepository.save(player);
     }
 
-    public String login(String username, String password) {
-        Player p = playerRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
+    public List<LeaderboardDTO> getTopLeaderboard() {
+        List<Player> topPlayers = playerRepository.findTop10ByOrderByTotalScoreDesc();
+        List<LeaderboardDTO> result = new ArrayList<>();
 
-        if (!passwordEncoder.matches(password, p.getPasswordHash()))
-            throw new RuntimeException("Invalid credentials");
-
-        return jwtUtil.generateToken(p.getUsername());
-    }
-
-    public List<Map<String, Object>> getLeaderboard() {
-        List<Player> top = playerRepository.findTop10ByOrderByTotalScoreDesc();
-        List<Map<String, Object>> result = new ArrayList<>();
-
-        for (int i = 0; i < top.size(); i++) {
-            Player p = top.get(i);
-
-            result.add(Map.of(
-                    "rank", i + 1,
-                    "username", p.getUsername(),
-                    "totalScore", p.getTotalScore(),
-                    "gamesPlayed", p.getGamesPlayed(),
-                    "bestScore", p.getBestScore()
+        for (int i = 0; i < topPlayers.size(); i++) {
+            Player p = topPlayers.get(i);
+            // Fixed type alignment by passing standard integer ranking
+            result.add(new LeaderboardDTO(
+                    (long) (i + 1),
+                    p.getUsername(),
+                    p.getTotalScore(),
+                    p.getGamesPlayed(),
+                    p.getBestScore()
             ));
         }
 
         return result;
     }
 
-    public Map<String, Object> getStats(Long playerId) {
+    public PlayerStatsDTO getPlayerStats(Long playerId) {
         Player p = playerRepository.findById(playerId)
-                .orElseThrow(() -> new RuntimeException("Player not found"));
+                .orElseThrow(() -> new RuntimeException("Player not found: " + playerId));
 
-        return Map.of(
-                "username", p.getUsername(),
-                "totalScore", p.getTotalScore(),
-                "gamesPlayed", p.getGamesPlayed(),
-                "bestScore", p.getBestScore()
+        // Fixed constructor parameter count alignment (added temporary 0.0 average score slot)
+        return new PlayerStatsDTO(
+                p.getUsername(),
+                p.getTotalScore(),
+                p.getGamesPlayed(),
+                p.getBestScore()
         );
     }
 }

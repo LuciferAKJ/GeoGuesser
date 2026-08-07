@@ -19,6 +19,12 @@ let roundNum = 1;
 let runningScore = 0;
 const TOTAL_ROUNDS = 5;
 
+let canGuess = true;
+let mapExpanded = false;
+const floatingMap = () => document.getElementById('floating-map');
+const mapModal = () => document.getElementById('map-modal');
+const modalContent = () => document.querySelector('.map-modal-content');
+
 // ── INIT ──────────────────────────────────────────────────
 window.onload = () => {
   if (token && playerId) {
@@ -27,6 +33,28 @@ window.onload = () => {
   } else {
     showLogin();
   }
+
+  document
+    .getElementById('expand-map-btn')
+    .addEventListener('click', expandMap);
+
+  document
+    .getElementById('close-map-btn')
+    .addEventListener('click', collapseMap);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      collapseMap();
+    }
+
+    if (e.key.toLowerCase() === 'm') {
+      if (mapExpanded) {
+        collapseMap();
+      } else {
+        expandMap();
+      }
+    }
+  });
 };
 
 // ── SCREENS ───────────────────────────────────────────────
@@ -69,37 +97,92 @@ function toggle(a, b) {
 }
 
 // ── MAP ───────────────────────────────────────────────────
+function mapClickHandler(e) {
+  if (!canGuess) return;
+
+  if (
+    document.getElementById('guess-btn').disabled &&
+    document.getElementById('next-btn').style.display !== 'none'
+  ) return;
+
+  placeGuessPin(e.latlng.lat, e.latlng.lng);
+}
+
 function initMap() {
   if (map) return;
 
   map = L.map('world-map', {
     center: [20, 0],
     zoom: 2,
-    minZoom: 1
+    minZoom: 2,
+    maxZoom: 8,
+    zoomControl: false,
+    worldCopyJump: true,
+    scrollWheelZoom: false,
+    doubleClickZoom: false,
+    attributionControl: false
   });
+
+  L.control.zoom({
+    position: 'bottomleft'
+  }).addTo(map);
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     attribution: '© OpenStreetMap © CARTO'
   }).addTo(map);
 
-  map.on('click', (e) => {
-    if (document.getElementById('guess-btn').disabled &&
-        document.getElementById('next-btn').style.display !== 'none') return;
-
-    placeGuessPin(e.latlng.lat, e.latlng.lng);
+  map.getContainer().addEventListener('mouseenter', () => {
+    map.scrollWheelZoom.disable();
   });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey) {
+      map.scrollWheelZoom.enable();
+    }
+  });
+
+  document.addEventListener('keyup', () => {
+    map.scrollWheelZoom.disable();
+  });
+
+  map.on('click', mapClickHandler);
+}
+
+function expandMap() {
+  if (mapExpanded) return;
+
+  mapExpanded = true;
+  mapModal().classList.add('active');
+
+  modalContent().appendChild(
+    document.getElementById('world-map')
+  );
+
+  setTimeout(() => {
+    map.invalidateSize();
+  }, 250);
+}
+
+function collapseMap() {
+  if (!mapExpanded) return;
+
+  mapExpanded = false;
+
+  floatingMap().appendChild(
+    document.getElementById('world-map')
+  );
+
+  mapModal().classList.remove('active');
+
+  setTimeout(() => {
+    map.invalidateSize();
+  }, 250);
 }
 
 function placeGuessPin(lat, lng) {
   const icon = L.divIcon({
     className: '',
-    html: `<div style="
-      width:18px;height:18px;
-      background:#e94560;
-      border:3px solid #fff;
-      border-radius:50%;
-      box-shadow:0 2px 6px rgba(0,0,0,.5)">
-    </div>`,
+    html: `<div class="guess-marker"></div>`,
     iconAnchor: [9, 9]
   });
 
@@ -190,6 +273,8 @@ async function startGame() {
 }
 
 async function loadRound() {
+  canGuess = true;
+
   document.getElementById('result-ribbon').style.display = 'none';
   document.getElementById('guess-btn').disabled = true;
   document.getElementById('guess-btn').style.display = 'block';
@@ -200,7 +285,24 @@ async function loadRound() {
   document.getElementById('img-loader').style.display = 'flex';
   document.getElementById('location-img').style.display = 'none';
 
-  if (guessMarker) map.removeLayer(guessMarker);
+  if (guessMarker) {
+    map.removeLayer(guessMarker);
+    guessMarker = null;
+  }
+
+  if (actualMarker) {
+    map.removeLayer(actualMarker);
+    actualMarker = null;
+  }
+
+  if (distanceLine) {
+    map.removeLayer(distanceLine);
+    distanceLine = null;
+  }
+
+  if (map) {
+    map.setView([20, 0], 2);
+  }
 
   stopTimer();
 
@@ -223,16 +325,52 @@ async function loadRound() {
   }
 }
 
+function animateNumber(elementId, start, end, duration = 800) {
+    const element = document.getElementById(elementId);
+    const startTime = performance.now();
+
+    function update(currentTime) {
+        const progress = Math.min((currentTime - startTime) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const value = Math.round(start + (end - start) * eased);
+        element.textContent = value.toLocaleString();
+
+        if (progress < 1) {
+            requestAnimationFrame(update);
+        }
+    }
+
+    requestAnimationFrame(update);
+}
+
+function animateScore(score){
+    const element = document.getElementById('result-score');
+    const start = performance.now();
+
+    function frame(time){
+        const progress = Math.min((time - start) / 800, 1);
+        const value = Math.round(score * progress);
+        element.textContent = value.toLocaleString() + " pts";
+
+        if(progress < 1){
+            requestAnimationFrame(frame);
+        }
+    }
+
+    requestAnimationFrame(frame);
+}
+
 async function submitGuess() {
   if (!guessMarker) return;
 
   const { lat, lng } = guessMarker.getLatLng();
 
   stopTimer();
+  canGuess = false;
 
   try {
     const data = await api(
-      `/game/guess?playerId=${playerId}`,
+      '/game/guess',
       'POST',
       {
         locationId: currentLocationId,
@@ -243,12 +381,29 @@ async function submitGuess() {
       true
     );
 
+    const previousScore = runningScore;
     runningScore += data.score;
-    document.getElementById('running-score').textContent =
-      runningScore.toLocaleString();
+    animateNumber(
+        'running-score',
+        previousScore,
+        runningScore,
+        900
+    );
 
-    document.getElementById('result-label').textContent =
-      data.performanceLabel;
+    const label = document.getElementById("result-label");
+    label.className = "";
+    const performance = data.performanceLabel.toUpperCase();
+    label.textContent = performance;
+    
+    if(performance.includes("PERFECT")){
+        label.classList.add("badge-perfect");
+    } else if(performance.includes("EXCELLENT")){
+        label.classList.add("badge-excellent");
+    } else if(performance.includes("GOOD")){
+        label.classList.add("badge-good");
+    } else {
+        label.classList.add("badge-average");
+    }
 
     document.getElementById('result-place').textContent =
       `${data.city}, ${data.country}`;
@@ -256,14 +411,16 @@ async function submitGuess() {
     document.getElementById('result-dist').textContent =
       `${data.distanceKm.toFixed(1)} km`;
 
-    document.getElementById('result-score').textContent =
-      `${data.score} pts`;
+    document.getElementById('result-score').textContent = "0 pts";
+    animateScore(data.score);
 
-    document.getElementById('result-ribbon').style.display = 'block';
+    setTimeout(() => {
+        document.getElementById('result-ribbon').style.display = 'block';
+    }, 350);
 
     const actualIcon = L.divIcon({
       className: '',
-      html: `<div style="width:18px;height:18px;background:#4caf50;border:3px solid #fff;border-radius:50%"></div>`,
+      html: `<div class="actual-marker"></div>`,
       iconAnchor: [9, 9]
     });
 
@@ -277,10 +434,15 @@ async function submitGuess() {
       { color: '#f5c518', dashArray: '6,6' }
     ).addTo(map);
 
-    map.fitBounds([
+    const bounds = L.latLngBounds([
       [lat, lng],
       [data.actualLatitude, data.actualLongitude]
     ]);
+
+    map.flyToBounds(bounds, {
+      padding: [80, 80],
+      duration: 1.5
+    });
 
     document.getElementById('guess-btn').style.display = 'none';
 
@@ -327,7 +489,6 @@ async function api(path, method = 'GET', body = null, auth = false) {
     'Content-Type': 'application/json'
   };
 
-  // Always send JWT if available
   if (token) {
     headers.Authorization = 'Bearer ' + token;
   }
@@ -361,6 +522,7 @@ async function api(path, method = 'GET', body = null, auth = false) {
 
   return data;
 }
+
 // ── UTILS ─────────────────────────────────────────────────
 function val(id) {
   return document.getElementById(id).value.trim();

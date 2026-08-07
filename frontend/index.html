@@ -56,36 +56,49 @@
 
   <div class="game-body">
 
-    <div class="image-panel">
-      <div id="img-loader" class="loader-overlay">
-        <div class="spinner"></div>
-        <span>Loading location...</span>
-      </div>
-      <img id="location-img" src="" alt="Guess this location" style="display:none"/>
+    <div class="game-stage">
+        <div class="image-panel">
+            <div id="img-loader" class="loader-overlay">
+                <div class="spinner"></div>
+                <span>Loading location...</span>
+            </div>
+            <img id="location-img" src="" alt="Guess this location" style="display:none"/>
 
-      <div id="result-ribbon" style="display:none">
-        <span id="result-label"></span>
-        &nbsp;·&nbsp;
-        <b id="result-place"></b>
-        &nbsp;·&nbsp;
-        📏 <b id="result-dist"></b>
-        &nbsp;·&nbsp;
-        ⭐ <b id="result-score"></b>
-      </div>
+            <div id="result-ribbon" style="display:none">
+                <span id="result-label"></span>
+                &nbsp;·&nbsp;
+                <b id="result-place"></b>
+                &nbsp;·&nbsp;
+                📏 <b id="result-dist"></b>
+                &nbsp;·&nbsp;
+                ⭐ <b id="result-score"></b>
+            </div>
+
+            <!-- Floating Minimap -->
+            <div id="floating-map" class="floating-map">
+                <button id="expand-map-btn" class="expand-map-btn" aria-label="Expand Map">⤢</button>
+                <div id="world-map"></div>
+            </div>
+        </div>
+    </div><!-- end game-stage -->
+
+    <div id="map-modal" class="map-modal">
+        <div class="map-modal-content">
+            <button id="close-map-btn" class="close-map-btn">✕</button>
+            <div id="map-modal-overlay"></div>
+        </div>
     </div>
 
-    <div class="map-panel">
-      <div id="world-map"></div>
-
-      <div class="map-controls">
+    <div class="action-bar">
         <div id="pin-hint" class="hint-badge">📍 Click on the map to place your guess</div>
-        <button class="btn-primary guess-btn" id="guess-btn" onclick="submitGuess()" disabled>
-          Submit Guess
-        </button>
-        <button class="btn-ghost next-btn" id="next-btn" onclick="nextRound()" style="display:none">
-          Next Location →
-        </button>
-      </div>
+        <div class="action-buttons">
+            <button class="btn-primary guess-btn" id="guess-btn" onclick="submitGuess()" disabled>
+                Submit Guess
+            </button>
+            <button class="btn-ghost next-btn" id="next-btn" onclick="nextRound()" style="display:none">
+                Next Location →
+            </button>
+        </div>
     </div>
 
   </div>

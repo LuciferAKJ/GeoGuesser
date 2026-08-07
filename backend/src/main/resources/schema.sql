@@ -1,6 +1,4 @@
--- Run this once to set up the database
--- Or let Spring Boot auto-create via spring.jpa.hibernate.ddl-auto=update
-
+-- Drop statements or rely on IF NOT EXISTS for safe initial execution
 CREATE TABLE IF NOT EXISTS players (
     id BIGSERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -19,14 +17,14 @@ CREATE TABLE IF NOT EXISTS locations (
     country VARCHAR(100) NOT NULL,
     city VARCHAR(100) NOT NULL,
     image_url VARCHAR(1024),
-    difficulty VARCHAR(10) DEFAULT 'MEDIUM',
+    difficulty VARCHAR(10) CHECK (difficulty IN ('EASY', 'MEDIUM', 'HARD')) DEFAULT 'MEDIUM',
     times_played INT DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS games (
     id BIGSERIAL PRIMARY KEY,
-    player_id BIGINT REFERENCES players(id),
-    location_id BIGINT REFERENCES locations(id),
+    player_id BIGINT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    location_id BIGINT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
     guess_latitude DOUBLE PRECISION,
     guess_longitude DOUBLE PRECISION,
     distance_km DOUBLE PRECISION,
@@ -36,5 +34,10 @@ CREATE TABLE IF NOT EXISTS games (
     is_daily_challenge BOOLEAN DEFAULT FALSE
 );
 
+-- Performance and Query Optimization Indexes
 CREATE INDEX IF NOT EXISTS idx_games_player ON games(player_id);
+CREATE INDEX IF NOT EXISTS idx_games_location ON games(location_id);
 CREATE INDEX IF NOT EXISTS idx_players_score ON players(total_score DESC);
+CREATE INDEX IF NOT EXISTS idx_players_username ON players(username);
+CREATE INDEX IF NOT EXISTS idx_locations_country ON locations(country);
+CREATE INDEX IF NOT EXISTS idx_locations_difficulty ON locations(difficulty);

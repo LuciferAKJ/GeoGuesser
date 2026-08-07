@@ -1,44 +1,30 @@
 package com.geoguesser.controller;
 
-import com.geoguesser.model.Player;
-import com.geoguesser.repository.PlayerRepository;
-import com.geoguesser.service.GameService;
+import com.geoguesser.dto.LeaderboardDTO;
+import com.geoguesser.dto.PlayerStatsDTO;
+import com.geoguesser.service.PlayerService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/player")
 public class PlayerController {
 
-    private final PlayerRepository playerRepository;
-    private final GameService gameService;
+    private final PlayerService playerService;
 
-    public PlayerController(PlayerRepository playerRepository,
-                            GameService gameService) {
-        this.playerRepository = playerRepository;
-        this.gameService = gameService;
+    public PlayerController(PlayerService playerService) {
+        this.playerService = playerService;
     }
 
     @GetMapping("/leaderboard")
-    public ResponseEntity<List<Player>> leaderboard() {
-        return ResponseEntity.ok(
-                playerRepository.findTop10ByOrderByTotalScoreDesc()
-        );
+    public ResponseEntity<List<LeaderboardDTO>> leaderboard() {
+        return ResponseEntity.ok(playerService.getTopLeaderboard());
     }
 
     @GetMapping("/{id}/stats")
-    public ResponseEntity<?> stats(@PathVariable Long id) {
-        return playerRepository.findById(id)
-                .map(p -> ResponseEntity.ok(Map.of(
-                        "username", p.getUsername(),
-                        "totalScore", p.getTotalScore(),
-                        "gamesPlayed", p.getGamesPlayed(),
-                        "bestScore", p.getBestScore(),
-                        "averageScore", gameService.getAverageScore(id).orElse(0.0)
-                )))
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<PlayerStatsDTO> stats(@PathVariable Long id) {
+        return ResponseEntity.ok(playerService.getPlayerStats(id));
     }
 }

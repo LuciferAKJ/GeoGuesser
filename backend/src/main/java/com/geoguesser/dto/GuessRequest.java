@@ -1,20 +1,34 @@
 package com.geoguesser.dto;
 
-public class GuessRequest {
-    private Long locationId;
-    private Double guessLatitude;
-    private Double guessLongitude;
-    private int timeTakenSeconds;
-    private boolean dailyChallenge;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-    public Long getLocationId() { return locationId; }
-    public Double getGuessLatitude() { return guessLatitude; }
-    public Double getGuessLongitude() { return guessLongitude; }
-    public int getTimeTakenSeconds() { return timeTakenSeconds; }
-    public boolean isDailyChallenge() { return dailyChallenge; }
-    public void setLocationId(Long v) { this.locationId=v; }
-    public void setGuessLatitude(Double v) { this.guessLatitude=v; }
-    public void setGuessLongitude(Double v) { this.guessLongitude=v; }
-    public void setTimeTakenSeconds(int v) { this.timeTakenSeconds=v; }
-    public void setDailyChallenge(boolean v) { this.dailyChallenge=v; }
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class GuessRequest {
+
+    @NotNull(message = "Location ID cannot be null")
+    private Long locationId;
+
+    @NotNull(message = "Guess latitude cannot be null")
+    @Min(value = -90, message = "Latitude must be >= -90")
+    @Max(value = 90, message = "Latitude must be <= 90")
+    private Double guessLatitude;
+
+    @NotNull(message = "Guess longitude cannot be null")
+    @Min(value = -180, message = "Longitude must be >= -180")
+    @Max(value = 180, message = "Longitude must be <= 180")
+    private Double guessLongitude;
+
+    @Min(value = 0, message = "Time taken cannot be negative")
+    private int timeTakenSeconds;
+
+    private boolean dailyChallenge;
 }

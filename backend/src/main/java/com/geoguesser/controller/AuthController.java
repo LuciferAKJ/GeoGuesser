@@ -1,13 +1,16 @@
 package com.geoguesser.controller;
 
 import com.geoguesser.config.JwtUtil;
+import com.geoguesser.dto.AuthResponse;
+import com.geoguesser.dto.LoginRequest;
+import com.geoguesser.dto.MessageResponse;
+import com.geoguesser.dto.RegisterRequest;
 import com.geoguesser.model.Player;
 import com.geoguesser.repository.PlayerRepository;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -17,43 +20,42 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
-    public AuthController(PlayerRepository playerRepository,PasswordEncoder passwordEncoder,JwtUtil jwtUtil) {
+    public AuthController(PlayerRepository playerRepository, PasswordEncoder passwordEncoder, JwtUtil jwtUtil) {
         this.playerRepository = playerRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody Map<String, String> body) {
-        String username = body.get("username");
-        String email = body.get("email");
-        String password = body.get("password");
+    public ResponseEntity<MessageResponse> register(@Valid @RequestBody RegisterRequest request) {
+        // TODO: Replace with custom exception (e.g. UsernameAlreadyExistsException)
+        if (playerRepository.existsByUsername(request.getUsername())) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Username taken"));
+        }
 
-        if (playerRepository.existsByUsername(username))
-            return ResponseEntity.badRequest().body("Username taken");
+        // TODO: Replace with custom exception (e.g. EmailAlreadyExistsException)
+        if (playerRepository.existsByEmail(request.getEmail())) {
+            return ResponseEntity.badRequest().body(new MessageResponse("Email already registered"));
+        }
 
-        if (playerRepository.existsByEmail(email))
-            return ResponseEntity.badRequest().body("Email already registered");
-
-        Player player = new Player(username, email, passwordEncoder.encode(password));
+        Player player = new Player(
+                request.getUsername(),
+                request.getEmail(),
+                passwordEncoder.encode(request.getPassword())
+        );
         playerRepository.save(player);
 
-        return ResponseEntity.ok(Map.of("message", "Registered successfully"));
+        return ResponseEntity.ok(new MessageResponse("Registered successfully"));
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> body) {
-        String username = body.get("username");
-        String password = body.get("password");
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+        Player player = playerRepository.findByUsername(request.getUsername())
+                .filter(p -> passwordEncoder.matches(request.getPassword(), p.getPasswordHash()))
+                // TODO: Replace with custom exception (e.g. InvalidCredentialsException)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
 
-        return playerRepository.findByUsername(username)
-                .filter(p -> passwordEncoder.matches(password, p.getPasswordHash()))
-                .map(p -> ResponseEntity.ok(Map.of(
-                        "token", jwtUtil.generateToken(p.getUsername()),
-                        "playerId", p.getId(),
-                        "username", p.getUsername()
-                )))
-                .orElse(ResponseEntity.status(401)
-                        .body(Map.of("error", "Invalid credentials")));
+        String token = jwtUtil.generateToken(player.getUsername());
+        return ResponseEntity.ok(new AuthResponse(token, player.getId(), player.getUsername(), "Login successful"));
     }
 }

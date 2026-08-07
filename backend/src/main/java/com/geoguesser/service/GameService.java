@@ -20,22 +20,24 @@ public class GameService {
     private final PlayerRepository playerRepository;
     private final LocationService locationService;
     private final ScoringService scoringService;
+    private final PlayerService playerService;
 
     public GameService(GameRepository gameRepository,
                        PlayerRepository playerRepository,
                        LocationService locationService,
-                       ScoringService scoringService) {
+                       ScoringService scoringService,
+                       PlayerService playerService) {
         this.gameRepository = gameRepository;
         this.playerRepository = playerRepository;
         this.locationService = locationService;
         this.scoringService = scoringService;
+        this.playerService = playerService;
     }
 
     @Transactional
-    public GuessResult processGuess(Long playerId, GuessRequest guessRequest) {
-
-        Player player = playerRepository.findById(playerId)
-                .orElseThrow(() -> new RuntimeException("Player not found: " + playerId));
+    public GuessResult processGuess(String username, GuessRequest guessRequest) {
+        Player player = playerRepository.findByUsernameIgnoreCase(username)
+                .orElseThrow(() -> new RuntimeException("Player not found"));
 
         Location location = locationService.getById(guessRequest.getLocationId())
                 .orElseThrow(() -> new RuntimeException("Location not found: " + guessRequest.getLocationId()));
@@ -50,25 +52,10 @@ public class GameService {
         int baseScore = scoringService.calculateScore(distanceKm);
         int finalScore = scoringService.applyTimeBonus(baseScore, guessRequest.getTimeTakenSeconds());
 
-        Game game = new Game(player, location);
-        game.setGuessLatitude(guessRequest.getGuessLatitude());
-        game.setGuessLongitude(guessRequest.getGuessLongitude());
-        game.setDistanceKm(distanceKm);
-        game.setScore(finalScore);
-        game.setTimeTakenSeconds(guessRequest.getTimeTakenSeconds());
-        game.setIsDailyChallenge(guessRequest.isDailyChallenge());
-
+        Game game = buildGame(player, location, guessRequest, distanceKm, finalScore);
         gameRepository.save(game);
 
-        player.setGamesPlayed(player.getGamesPlayed() + 1);
-        player.setTotalScore(player.getTotalScore() + finalScore);
-
-        if (finalScore > player.getBestScore()) {
-            player.setBestScore(finalScore);
-        }
-
-        playerRepository.save(player);
-
+        playerService.updatePlayerStatistics(player, finalScore);
         locationService.incrementPlayCount(location.getId());
 
         return GuessResult.builder()
@@ -83,8 +70,21 @@ public class GameService {
                 .build();
     }
 
-    public List<Game> getRecentGames(Long playerId) {
-        return gameRepository.findRecentGames(playerId);
+    private Game buildGame(Player player, Location location, GuessRequest request, double distanceKm, int finalScore) {
+        Game game = new Game(player, location);
+        game.setGuessLatitude(request.getGuessLatitude());
+        game.setGuessLongitude(request.getGuessLongitude());
+        game.setDistanceKm(distanceKm);
+        game.setScore(finalScore);
+        game.setTimeTakenSeconds(request.getTimeTakenSeconds());
+        game.setIsDailyChallenge(request.isDailyChallenge());
+        return game;
+    }
+
+    public List<Game> getRecentGames(String username) {
+        Player player = playerRepository.findByUsernameIgnoreCase(username)
+                .orElseThrow(() -> new RuntimeException("Player not found: " + username));
+        return gameRepository.findByPlayerIdOrderByPlayedAtDesc(player.getId());
     }
 
     public Optional<Double> getAverageScore(Long playerId) {

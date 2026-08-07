@@ -156,3 +156,15 @@ Plus up to **+500 time bonus** for guessing within 10 seconds.
 - **JavaFX** — scene graph, async image loading, Timeline animation
 - **Full-stack integration** — JavaFX ↔ Spring Boot over HTTP
 - **Auth flow** — registration, BCrypt hashing, JWT tokens
+
+
+
+## Environment Variables
+
+Create a local configuration using the following variables:
+
+- DB_URL
+- DB_USERNAME
+- DB_PASSWORD
+- JWT_SECRET
+- MAPBOX_ACCESS_TOKEN
