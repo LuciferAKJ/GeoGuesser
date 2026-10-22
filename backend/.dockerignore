@@ -1,0 +1,25 @@
+# Build output and archives
+target/
+*.jar
+*.war
+
+# Local development secrets and overrides
+src/main/resources/application-local.properties
+**/application-local.properties
+.env
+.env.*
+
+# Local backups and checkpoints
+checkpoint_phase1_working/
+.claude/
+scratch/
+
+# IDE and OS metadata
+.git/
+.gitignore
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+*.log
