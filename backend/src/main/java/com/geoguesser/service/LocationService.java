@@ -51,22 +51,34 @@ public class LocationService {
     }
 
     private Location ensureImageUrl(Location location) {
-        if (location.getImageUrl() == null || location.getImageUrl().isBlank()) {
+        String currentUrl = location.getImageUrl();
+
+        boolean needsRegeneration =
+                currentUrl == null
+                || currentUrl.isBlank()
+                || currentUrl.contains("satellite-streets-v12")
+                || currentUrl.contains("YOUR_EXISTING_MAPBOX_TOKEN");
+
+        if (needsRegeneration) {
             String url = buildMapboxImageUrl(
                     location.getLongitude(),
                     location.getLatitude(),
-                    13, 800, 500
+                    13,
+                    800,
+                    500
             );
+
             location.setImageUrl(url);
             locationRepository.save(location);
         }
+
         return location;
     }
 
     // TODO: Move to MapboxService in later architectural expansion
     public String buildMapboxImageUrl(double lon, double lat, int zoom, int width, int height) {
         return String.format(
-                "https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/static/" +
+                "https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/" +
                 "%.6f,%.6f,%d,0/%dx%d?access_token=%s",
                 lon, lat, zoom, width, height, mapboxToken
         );

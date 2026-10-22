@@ -1,7 +1,9 @@
 package com.geoguesser.service;
 
+import com.geoguesser.dto.GameHistoryDTO;
 import com.geoguesser.dto.GuessRequest;
 import com.geoguesser.dto.GuessResult;
+import com.geoguesser.exception.EntityNotFoundException;
 import com.geoguesser.model.Game;
 import com.geoguesser.model.Location;
 import com.geoguesser.model.Player;
@@ -37,10 +39,10 @@ public class GameService {
     @Transactional
     public GuessResult processGuess(String username, GuessRequest guessRequest) {
         Player player = playerRepository.findByUsernameIgnoreCase(username)
-                .orElseThrow(() -> new RuntimeException("Player not found"));
+                .orElseThrow(() -> new EntityNotFoundException("Player not found: " + username));
 
         Location location = locationService.getById(guessRequest.getLocationId())
-                .orElseThrow(() -> new RuntimeException("Location not found: " + guessRequest.getLocationId()));
+                .orElseThrow(() -> new EntityNotFoundException("Location not found: " + guessRequest.getLocationId()));
 
         double distanceKm = scoringService.calculateDistance(
                 location.getLatitude(),
@@ -81,10 +83,25 @@ public class GameService {
         return game;
     }
 
-    public List<Game> getRecentGames(String username) {
+    public List<GameHistoryDTO> getRecentGames(String username) {
         Player player = playerRepository.findByUsernameIgnoreCase(username)
-                .orElseThrow(() -> new RuntimeException("Player not found: " + username));
-        return gameRepository.findByPlayerIdOrderByPlayedAtDesc(player.getId());
+                .orElseThrow(() -> new EntityNotFoundException("Player not found: " + username));
+
+        List<Game> games =
+                gameRepository.findTop10ByPlayerIdOrderByPlayedAtDesc(player.getId());
+
+        return games.stream()
+                .map(game -> new GameHistoryDTO(
+                        game.getId(),
+                        game.getLocation().getCountry(),
+                        game.getLocation().getCity(),
+                        game.getScore(),
+                        game.getDistanceKm(),
+                        game.getTimeTakenSeconds(),
+                        game.getPlayedAt(),
+                        game.getIsDailyChallenge()
+                ))
+                .toList();
     }
 
     public Optional<Double> getAverageScore(Long playerId) {

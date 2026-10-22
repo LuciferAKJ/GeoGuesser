@@ -1,5 +1,6 @@
 package com.geoguesser.controller;
 
+import com.geoguesser.dto.GameHistoryDTO;
 import com.geoguesser.dto.GuessRequest;
 import com.geoguesser.dto.GuessResult;
 import com.geoguesser.service.GameService;
@@ -8,6 +9,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/game")
@@ -30,7 +33,11 @@ public class GameController {
     }
 
     @GetMapping("/history")
-    public ResponseEntity<?> history(@AuthenticationPrincipal UserDetails user) {
-        return ResponseEntity.ok(gameService.getRecentGames(user.getUsername()));
+    public ResponseEntity<List<GameHistoryDTO>> history(
+            @AuthenticationPrincipal UserDetails user) {
+
+        return ResponseEntity.ok(
+                gameService.getRecentGames(user.getUsername())
+        );
     }
 }

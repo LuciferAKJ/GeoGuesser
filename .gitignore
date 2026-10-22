@@ -30,8 +30,14 @@ Thumbs.db
 .env
 .env.*
 
-# Secrets
+# Secrets & Local Properties
 **/application-local.properties
+backend/src/main/resources/application-local.properties
+
+# Local Checkpoints & AI Cache
+checkpoint_phase1_working/
+.claude/
+scratch/
 
 # Node (future)
 node_modules/
@@ -42,5 +48,3 @@ node_modules/
 
 # JVM crash logs
 hs_err_pid*
-
-backend/src/main/resources/application-local.properties

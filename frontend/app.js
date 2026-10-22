@@ -1,5 +1,154 @@
+// ── LEADERBOARD ───────────────────────────────────────────
+async function loadLeaderboard() {
+    const tbody = document.getElementById('lb-body');
+
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="5" style="text-align:center;">
+                Loading...
+            </td>
+        </tr>
+    `;
+
+    try {
+        const players = await api('/player/leaderboard');
+
+        if (!players.length) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align:center;">
+                        No players yet.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = players.map(player => {
+            let rankDisplay = player.rank;
+            if (player.rank === 1) rankDisplay = '🥇 1';
+            else if (player.rank === 2) rankDisplay = '🥈 2';
+            else if (player.rank === 3) rankDisplay = '🥉 3';
+
+            return `
+            <tr>
+                <td class="lb-rank">${rankDisplay}</td>
+                <td class="lb-user">${escapeHtml(player.username)}</td>
+                <td class="lb-score">${Number(player.totalScore || 0).toLocaleString()}</td>
+                <td class="lb-best">${Number(player.bestScore || 0).toLocaleString()}</td>
+                <td>${player.gamesPlayed || 0}</td>
+            </tr>
+            `;
+        }).join('');
+
+    } catch (e) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align:center; color:#e94560;">
+                    Failed to load leaderboard
+                </td>
+            </tr>
+        `;
+
+        console.error('Leaderboard error:', e);
+    }
+}
+
+// ── GAME HISTORY ───────────────────────────────────────────
+async function loadHistory() {
+  const tbody = document.getElementById('history-body');
+
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="6" style="text-align:center;">
+        Loading...
+      </td>
+    </tr>
+  `;
+
+  try {
+    const games = await api('/game/history');
+
+    if (!games.length) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align:center;">
+            No games played yet.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = games.map((game, index) => {
+      const playedAt = new Date(game.playedAt);
+
+      const formattedDate = playedAt.toLocaleString([], {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      return `
+        <tr>
+          <td>${index + 1}</td>
+
+          <td>
+            <strong>${escapeHtml(game.city)}</strong>
+            <br>
+            <span class="history-country">
+              ${escapeHtml(game.country)}
+            </span>
+          </td>
+
+          <td class="history-score">
+            ${Number(game.score || 0).toLocaleString()}
+          </td>
+
+          <td>
+            ${Number(game.distanceKm || 0).toFixed(1)} km
+          </td>
+
+          <td>
+            ${game.timeTakenSeconds || 0}s
+          </td>
+
+          <td>
+            ${formattedDate}
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+  } catch (e) {
+    console.error('History error:', e);
+
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align:center; color:#e94560;">
+          Failed to load game history
+        </td>
+      </tr>
+    `;
+  }
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 // ── CONFIG ────────────────────────────────────────────────
-const API = 'http://localhost:8080/api'; // change when deploying
+const API = (typeof window !== 'undefined' && window.ENV && window.ENV.API_URL && window.ENV.API_URL.trim() !== '')
+  ? window.ENV.API_URL.trim()
+  : ((typeof localStorage !== 'undefined' && localStorage.getItem('GEOGUESSER_API_URL'))
+     || 'http://localhost:8080/api');
 
 // ── STATE ─────────────────────────────────────────────────
 let token      = localStorage.getItem('token');
@@ -12,6 +161,7 @@ let actualMarker;
 let distanceLine;
 
 let currentLocationId = null;
+let roundLocations = [];
 let timerInterval = null;
 let elapsedSeconds = 0;
 
@@ -20,41 +170,21 @@ let runningScore = 0;
 const TOTAL_ROUNDS = 5;
 
 let canGuess = true;
-let mapExpanded = false;
-const floatingMap = () => document.getElementById('floating-map');
-const mapModal = () => document.getElementById('map-modal');
-const modalContent = () => document.querySelector('.map-modal-content');
+let isSubmittingGuess = false;
 
 // ── INIT ──────────────────────────────────────────────────
 window.onload = () => {
-  if (token && playerId) {
+  const storedToken = localStorage.getItem('token');
+  const storedPlayerId = localStorage.getItem('playerId');
+  if (storedToken && storedToken !== 'null' && storedToken !== 'undefined' && storedPlayerId) {
+    token = storedToken;
+    playerId = storedPlayerId;
+    username = localStorage.getItem('username');
     showGame();
     startGame();
   } else {
-    showLogin();
+    logout();
   }
-
-  document
-    .getElementById('expand-map-btn')
-    .addEventListener('click', expandMap);
-
-  document
-    .getElementById('close-map-btn')
-    .addEventListener('click', collapseMap);
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      collapseMap();
-    }
-
-    if (e.key.toLowerCase() === 'm') {
-      if (mapExpanded) {
-        collapseMap();
-      } else {
-        expandMap();
-      }
-    }
-  });
 };
 
 // ── SCREENS ───────────────────────────────────────────────
@@ -62,11 +192,16 @@ function show(id) {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('game-screen').style.display = 'none';
   document.getElementById('lb-screen').style.display = 'none';
+  document.getElementById('history-screen').style.display = 'none';
 
   const el = document.getElementById(id);
   el.style.display = 'flex';
 
-  if (id === 'auth-screen' || id === 'lb-screen') {
+  if (
+    id === 'auth-screen' ||
+    id === 'lb-screen' ||
+    id === 'history-screen'
+  ) {
     el.style.alignItems = 'center';
   }
 }
@@ -91,6 +226,11 @@ function showLeaderboard() {
   loadLeaderboard();
 }
 
+function showHistory() {
+  show('history-screen');
+  loadHistory();
+}
+
 function toggle(a, b) {
   document.getElementById(a).style.display = 'flex';
   document.getElementById(b).style.display = 'none';
@@ -100,10 +240,8 @@ function toggle(a, b) {
 function mapClickHandler(e) {
   if (!canGuess) return;
 
-  if (
-    document.getElementById('guess-btn').disabled &&
-    document.getElementById('next-btn').style.display !== 'none'
-  ) return;
+  // Allow clicking as long as we're in an active round (before guess is submitted)
+  if (document.getElementById('next-btn').style.display !== 'none') return;
 
   placeGuessPin(e.latlng.lat, e.latlng.lng);
 }
@@ -115,75 +253,177 @@ function initMap() {
     center: [20, 0],
     zoom: 2,
     minZoom: 2,
-    maxZoom: 8,
-    zoomControl: false,
+    maxZoom: 18,
+    zoomControl: true,
     worldCopyJump: true,
-    scrollWheelZoom: false,
-    doubleClickZoom: false,
+    scrollWheelZoom: true,
+    doubleClickZoom: true,
+    dragging: true,
+    touchZoom: true,
+    boxZoom: false,
     attributionControl: false
   });
 
-  L.control.zoom({
-    position: 'bottomleft'
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
+    maxZoom: 16
   }).addTo(map);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap © CARTO'
-  }).addTo(map);
+  L.control.attribution({
+    position: 'bottomleft',
+    prefix: false
+  }).addAttribution('Tiles &copy; Esri').addTo(map);
 
-  map.getContainer().addEventListener('mouseenter', () => {
-    map.scrollWheelZoom.disable();
-  });
+  // Load country data and render zoom-tiered, collision-free labels
+  let countryData = null;
+  let countryLabelLayer = null;
 
-  document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey) {
-      map.scrollWheelZoom.enable();
+  function updateCountryLabels() {
+    if (!countryData || !map) return;
+
+    const zoom = map.getZoom();
+
+    if (countryLabelLayer) {
+      map.removeLayer(countryLabelLayer);
+      countryLabelLayer = null;
+    }
+
+    // Determine max priority by zoom level:
+    // Low zoom (< 3): Only prominent Priority 1 anchor countries
+    // Medium zoom (3 - 4.2): Priority 1 and 2 countries
+    // High zoom (>= 4.2): All countries
+    const maxPriority = zoom < 3 ? 1 : (zoom < 4.2 ? 2 : 3);
+
+    let bounds;
+    try {
+      bounds = map.getBounds().pad(0.15);
+    } catch {
+      bounds = null;
+    }
+
+    // Filter features by priority and current view bounds
+    const candidates = countryData.features
+      .filter(f => {
+        const priority = f.properties.priority || 3;
+        if (priority > maxPriority) return false;
+        if (bounds) {
+          const coords = f.geometry.coordinates; // [lng, lat]
+          return bounds.contains([coords[1], coords[0]]);
+        }
+        return true;
+      })
+      .sort((a, b) => (a.properties.priority || 3) - (b.properties.priority || 3));
+
+    // Collision detection in screen space to prevent overlapping text
+    const placedPoints = [];
+    const minDx = zoom < 3 ? 65 : (zoom < 4.2 ? 48 : 36);
+    const minDy = zoom < 3 ? 22 : (zoom < 4.2 ? 18 : 14);
+
+    const markers = [];
+
+    for (const feature of candidates) {
+      const coords = feature.geometry.coordinates;
+      const latlng = L.latLng(coords[1], coords[0]);
+      const pt = map.latLngToLayerPoint(latlng);
+
+      let collision = false;
+      for (const p of placedPoints) {
+        if (Math.abs(pt.x - p.x) < minDx && Math.abs(pt.y - p.y) < minDy) {
+          collision = true;
+          break;
+        }
+      }
+
+      if (!collision) {
+        placedPoints.push(pt);
+        const priority = feature.properties.priority || 3;
+        const labelMarker = L.marker(latlng, {
+          icon: L.divIcon({
+            className: 'country-label-wrapper',
+            html: `<span class="country-label-text priority-${priority}">${escapeHtml(feature.properties.name)}</span>`,
+            iconSize: [110, 18],
+            iconAnchor: [55, 9]
+          }),
+          interactive: false
+        });
+        markers.push(labelMarker);
+      }
+    }
+
+    countryLabelLayer = L.layerGroup(markers, { pane: 'tooltipPane' }).addTo(map);
+  }
+
+  fetch('countries.json')
+    .then(response => response.json())
+    .then(data => {
+      countryData = data;
+      updateCountryLabels();
+    })
+    .catch(err => console.warn('Country labels not loaded:', err));
+
+  map.on('zoomend', updateCountryLabels);
+  map.on('moveend', updateCountryLabels);
+
+  // Floating map resize & touch / desktop expansion handling
+  const mapContainer = document.getElementById('floating-map');
+  const expandBtn = document.getElementById('map-expand-btn');
+
+  function resizeMap() {
+    if (!map) return;
+    map.invalidateSize({ pan: false });
+  }
+
+  function toggleMapExpand(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    mapContainer.classList.toggle('expanded');
+    mapContainer.classList.remove('hovered');
+    setTimeout(resizeMap, 120);
+    setTimeout(resizeMap, 340);
+  }
+
+  if (expandBtn) {
+    expandBtn.addEventListener('click', toggleMapExpand);
+    expandBtn.addEventListener('touchend', toggleMapExpand);
+  }
+
+  // Smooth hover on desktop (only devices with fine pointer and hover capability)
+  if (window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    mapContainer.addEventListener('mouseenter', () => {
+      if (!mapContainer.classList.contains('expanded')) {
+        mapContainer.classList.add('hovered');
+        setTimeout(resizeMap, 120);
+        setTimeout(resizeMap, 340);
+      }
+    });
+
+    mapContainer.addEventListener('mouseleave', () => {
+      if (!mapContainer.classList.contains('expanded')) {
+        mapContainer.classList.remove('hovered');
+        setTimeout(resizeMap, 120);
+        setTimeout(resizeMap, 340);
+      }
+    });
+  }
+
+  // Recalculate dimensions on transition completion
+  mapContainer.addEventListener('transitionend', (e) => {
+    if (e.propertyName === 'width' || e.propertyName === 'height') {
+      resizeMap();
+      updateCountryLabels();
     }
   });
 
-  document.addEventListener('keyup', () => {
-    map.scrollWheelZoom.disable();
-  });
-
   map.on('click', mapClickHandler);
-}
-
-function expandMap() {
-  if (mapExpanded) return;
-
-  mapExpanded = true;
-  mapModal().classList.add('active');
-
-  modalContent().appendChild(
-    document.getElementById('world-map')
-  );
-
-  setTimeout(() => {
-    map.invalidateSize();
-  }, 250);
-}
-
-function collapseMap() {
-  if (!mapExpanded) return;
-
-  mapExpanded = false;
-
-  floatingMap().appendChild(
-    document.getElementById('world-map')
-  );
-
-  mapModal().classList.remove('active');
-
-  setTimeout(() => {
-    map.invalidateSize();
-  }, 250);
 }
 
 function placeGuessPin(lat, lng) {
   const icon = L.divIcon({
     className: '',
     html: `<div class="guess-marker"></div>`,
-    iconAnchor: [9, 9]
+    iconAnchor: [12, 12]
   });
 
   if (guessMarker) map.removeLayer(guessMarker);
@@ -191,7 +431,9 @@ function placeGuessPin(lat, lng) {
   guessMarker = L.marker([lat, lng], { icon }).addTo(map)
     .bindTooltip('Your guess');
 
-  document.getElementById('guess-btn').disabled = false;
+  if (canGuess && !isSubmittingGuess) {
+    document.getElementById('guess-btn').disabled = false;
+  }
   document.getElementById('pin-hint').textContent =
     `📍 ${lat.toFixed(3)}, ${lng.toFixed(3)} selected`;
 }
@@ -265,15 +507,22 @@ function saveAuth(data) {
 async function startGame() {
   roundNum = 1;
   runningScore = 0;
+  roundLocations = [];
 
   document.getElementById('running-score').textContent = 0;
   document.getElementById('final-overlay').style.display = 'none';
 
-  await loadRound();
+  try {
+    roundLocations = await api('/location/batch?count=5');
+    await loadRound();
+  } catch (e) {
+    document.getElementById('img-loader').textContent = 'Failed to load locations: ' + e.message;
+  }
 }
 
 async function loadRound() {
   canGuess = true;
+  isSubmittingGuess = false;
 
   document.getElementById('result-ribbon').style.display = 'none';
   document.getElementById('guess-btn').disabled = true;
@@ -307,7 +556,11 @@ async function loadRound() {
   stopTimer();
 
   try {
-    const data = await api('/location/random');
+    const data = roundLocations[roundNum - 1];
+
+    if (!data) {
+      throw new Error(`No location available for round ${roundNum}`);
+    }
 
     currentLocationId = data.id;
 
@@ -317,6 +570,12 @@ async function loadRound() {
       document.getElementById('img-loader').style.display = 'none';
       img.style.display = 'block';
       startTimer();
+    };
+
+    img.onerror = () => {
+      document.getElementById('img-loader').innerHTML =
+        '<span style="color:#e94560;">Failed to load location image</span><br>' +
+        '<span style="font-size:0.8rem;">URL: ' + data.imageUrl.substring(0, 100) + '...</span>';
     };
 
     img.src = data.imageUrl;
@@ -361,12 +620,25 @@ function animateScore(score){
 }
 
 async function submitGuess() {
-  if (!guessMarker) return;
+  if (!guessMarker || isSubmittingGuess || !canGuess) return;
+
+  const currentToken = localStorage.getItem('token') || token;
+  if (!currentToken || currentToken === 'null' || currentToken === 'undefined') {
+    alert('Please log in before submitting your guess.');
+    logout();
+    return;
+  }
+
+  const guessBtn = document.getElementById('guess-btn');
+  isSubmittingGuess = true;
+  canGuess = false;
+  if (guessBtn) {
+    guessBtn.disabled = true;
+  }
 
   const { lat, lng } = guessMarker.getLatLng();
 
   stopTimer();
-  canGuess = false;
 
   try {
     const data = await api(
@@ -377,8 +649,7 @@ async function submitGuess() {
         guessLatitude: lat,
         guessLongitude: lng,
         timeTakenSeconds: elapsedSeconds
-      },
-      true
+      }
     );
 
     const previousScore = runningScore;
@@ -415,13 +686,13 @@ async function submitGuess() {
     animateScore(data.score);
 
     setTimeout(() => {
-        document.getElementById('result-ribbon').style.display = 'block';
+        document.getElementById('result-ribbon').style.display = 'flex';
     }, 350);
 
     const actualIcon = L.divIcon({
       className: '',
       html: `<div class="actual-marker"></div>`,
-      iconAnchor: [9, 9]
+      iconAnchor: [11, 11]
     });
 
     actualMarker = L.marker(
@@ -444,7 +715,10 @@ async function submitGuess() {
       duration: 1.5
     });
 
-    document.getElementById('guess-btn').style.display = 'none';
+    if (guessBtn) {
+      guessBtn.disabled = true;
+      guessBtn.style.display = 'none';
+    }
 
     if (roundNum >= TOTAL_ROUNDS) {
       setTimeout(showFinal, 1500);
@@ -452,6 +726,12 @@ async function submitGuess() {
       document.getElementById('next-btn').style.display = 'block';
     }
   } catch (e) {
+    // If request fails, allow retry
+    isSubmittingGuess = false;
+    canGuess = true;
+    if (guessBtn) {
+      guessBtn.disabled = false;
+    }
     alert(e.message);
   }
 }
@@ -464,6 +744,21 @@ function nextRound() {
 function showFinal() {
   document.getElementById('final-score-val').textContent =
     runningScore.toLocaleString();
+
+  const gradeEl = document.getElementById('final-grade');
+  if (gradeEl) {
+    if (runningScore >= 24000) {
+      gradeEl.textContent = '🎖️ Geography Grandmaster! World-class navigation.';
+    } else if (runningScore >= 20000) {
+      gradeEl.textContent = '🌟 Master Explorer! Incredible global knowledge.';
+    } else if (runningScore >= 15000) {
+      gradeEl.textContent = '🧭 Seasoned Traveler! Great geographical instincts.';
+    } else if (runningScore >= 10000) {
+      gradeEl.textContent = '🗺️ Global Tourist! Solid effort, keep exploring.';
+    } else {
+      gradeEl.textContent = '🎒 Novice Wanderer! Practice makes perfect.';
+    }
+  }
 
   document.getElementById('final-overlay').style.display = 'flex';
 }
@@ -489,8 +784,9 @@ async function api(path, method = 'GET', body = null, auth = false) {
     'Content-Type': 'application/json'
   };
 
-  if (token) {
-    headers.Authorization = 'Bearer ' + token;
+  const storedToken = localStorage.getItem('token') || token;
+  if (storedToken && storedToken !== 'null' && storedToken !== 'undefined') {
+    headers['Authorization'] = 'Bearer ' + storedToken;
   }
 
   const res = await fetch(API + path, {
@@ -501,9 +797,12 @@ async function api(path, method = 'GET', body = null, auth = false) {
 
   const text = await res.text();
 
-  console.log(`${method} ${path}`);
-  console.log("Status:", res.status);
-  console.log("Body:", text);
+  if (res.status === 401 || res.status === 403) {
+    if (path !== '/auth/login' && path !== '/auth/register') {
+      logout();
+      throw new Error('Session expired or unauthorized. Please log in again.');
+    }
+  }
 
   if (!text.trim()) {
     throw new Error(`Server returned empty response (HTTP ${res.status})`);

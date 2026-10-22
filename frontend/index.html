@@ -9,6 +9,11 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
   <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
@@ -20,17 +25,17 @@
     <p class="sub">How well do you know the world?</p>
 
     <div id="login-form" class="form-section">
-      <input id="l-user" type="text" placeholder="Username"/>
-      <input id="l-pass" type="password" placeholder="Password"/>
+      <input id="l-user" type="text" placeholder="Username" autocomplete="username"/>
+      <input id="l-pass" type="password" placeholder="Password" autocomplete="current-password"/>
       <button class="btn-primary" onclick="login()">Login</button>
       <button class="btn-ghost" onclick="showRegister()">Create Account</button>
       <p class="msg" id="l-msg"></p>
     </div>
 
     <div id="register-form" class="form-section" style="display:none">
-      <input id="r-user" type="text" placeholder="Username"/>
-      <input id="r-email" type="email" placeholder="Email"/>
-      <input id="r-pass" type="password" placeholder="Password"/>
+      <input id="r-user" type="text" placeholder="Username" autocomplete="username"/>
+      <input id="r-email" type="email" placeholder="Email" autocomplete="email"/>
+      <input id="r-pass" type="password" placeholder="Password" autocomplete="new-password"/>
       <button class="btn-primary" onclick="register()">Register</button>
       <button class="btn-ghost" onclick="showLogin()">← Back to Login</button>
       <p class="msg" id="r-msg"></p>
@@ -48,9 +53,10 @@
       <span class="round-badge">Round <span id="round-num">1</span> / 5</span>
       <span class="score-badge">Score: <span id="running-score">0</span></span>
     </div>
-    <div style="display:flex;gap:8px">
-      <button class="btn-sm" onclick="showLeaderboard()">🏆</button>
-      <button class="btn-sm" onclick="logout()">Logout</button>
+    <div class="nav-actions">
+      <button class="btn-sm" onclick="showHistory()">📜 History</button>
+      <button class="btn-sm" onclick="showLeaderboard()">🏆 Leaderboard</button>
+      <button class="btn-sm btn-logout" onclick="logout()">Logout</button>
     </div>
   </nav>
 
@@ -66,28 +72,27 @@
 
             <div id="result-ribbon" style="display:none">
                 <span id="result-label"></span>
-                &nbsp;·&nbsp;
+                <span class="ribbon-sep">·</span>
                 <b id="result-place"></b>
-                &nbsp;·&nbsp;
-                📏 <b id="result-dist"></b>
-                &nbsp;·&nbsp;
-                ⭐ <b id="result-score"></b>
+                <span class="ribbon-sep">·</span>
+                <span class="ribbon-dist">📏 <b id="result-dist"></b></span>
+                <span class="ribbon-sep">·</span>
+                <span class="ribbon-score">⭐ <b id="result-score"></b></span>
             </div>
 
             <!-- Floating Minimap -->
-            <div id="floating-map" class="floating-map">
-                <button id="expand-map-btn" class="expand-map-btn" aria-label="Expand Map">⤢</button>
+            <div id="floating-map" class="floating-map" aria-label="World Minimap">
+                <div class="map-toolbar">
+                    <span class="map-title"><span class="map-icon">🗺️</span> World Map</span>
+                    <button type="button" id="map-expand-btn" class="map-toggle-btn" title="Toggle map size" aria-label="Toggle map size">
+                        <svg class="icon-expand" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                        <svg class="icon-collapse" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="10" y1="14" x2="3" y2="21"></line></svg>
+                    </button>
+                </div>
                 <div id="world-map"></div>
             </div>
         </div>
     </div><!-- end game-stage -->
-
-    <div id="map-modal" class="map-modal">
-        <div class="map-modal-content">
-            <button id="close-map-btn" class="close-map-btn">✕</button>
-            <div id="map-modal-overlay"></div>
-        </div>
-    </div>
 
     <div class="action-bar">
         <div id="pin-hint" class="hint-badge">📍 Click on the map to place your guess</div>
@@ -127,6 +132,48 @@
   </div>
 </div>
 
+<!-- ── GAME HISTORY ─────────────────────────────────── -->
+<div id="history-screen" class="screen center" style="display:none">
+  <div class="card history-card">
+
+    <div class="history-header">
+      <div>
+        <h2>📜 Game History</h2>
+        <p class="sub">Your last 10 games</p>
+      </div>
+    </div>
+
+    <div class="history-table-wrapper">
+      <table id="history-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Location</th>
+            <th>Score</th>
+            <th>Distance</th>
+            <th>Time</th>
+            <th>Played At</th>
+          </tr>
+        </thead>
+
+        <tbody id="history-body">
+          <tr>
+            <td colspan="6" style="text-align:center;">
+              Loading...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <button class="btn-ghost" style="margin-top:20px" onclick="showGame()">
+      ← Back to Game
+    </button>
+
+  </div>
+</div>
+
+<script src="config.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

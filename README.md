@@ -1,170 +1,151 @@
-# GeoGuesser — Full Stack Java
+# 🌍 GeoGuesser — Full Stack Geography Game
 
-A GeoGuesser-style geography game with JavaFX frontend + Spring Boot REST API + PostgreSQL.
-
----
-
-## Tech Stack
-
-| Layer    | Technology              |
-|----------|-------------------------|
-| Frontend | JavaFX 21               |
-| Backend  | Spring Boot 3.2         |
-| Database | PostgreSQL 15+          |
-| Maps     | Mapbox Static Images API|
-| Auth     | JWT (jjwt)              |
+A modern, immersive GeoGuesser-style web game built with a Spring Boot REST API, PostgreSQL, JWT authentication, Mapbox satellite imagery, and an interactive Leaflet world map with zoom-tiered country labels.
 
 ---
 
-## Project Structure
+## 🚀 Tech Stack
+
+| Layer | Technology |
+|---|---|
+| **Frontend** | Vanilla HTML5, Modern CSS3, JavaScript (ES6+) |
+| **Mapping & UI** | Leaflet, Esri Dark Canvas, Mapbox Satellite Imagery |
+| **Backend** | Spring Boot 3.2, Java 17, Maven |
+| **Security** | Spring Security, JWT (jjwt 0.11.5), BCrypt |
+| **Database** | PostgreSQL 15+ (Spring Data JPA / Hibernate) |
+
+---
+
+## 📁 Project Structure
 
 ```
 geoguesser/
-├── backend/               ← Spring Boot REST API
-│   └── src/main/java/com/geoguesser/
-│       ├── GeoGuesserApplication.java
-│       ├── model/         ← Location, Player, Game entities
-│       ├── repository/    ← Spring Data JPA repos
-│       ├── service/       ← ScoringService, LocationService, GameService
-│       ├── controller/    ← REST endpoints
-│       └── config/        ← JWT, Security, DataSeeder
+├── backend/                              ← Spring Boot REST API
+│   ├── pom.xml                           ← Maven dependencies & build plugins
+│   └── src/
+│       ├── main/java/com/geoguesser/
+│       │   ├── GeoGuesserApplication.java
+│       │   ├── config/                   ← SecurityConfig, CorsConfig, JwtFilter, JwtUtil, DataSeeder
+│       │   ├── controller/               ← AuthController, GameController, LocationController, PlayerController
+│       │   ├── dto/                      ← GuessRequest, GameHistoryDTO, LeaderboardDTO, etc.
+│       │   ├── model/                    ← Game, Location, Player entities
+│       │   ├── repository/               ← Spring Data JPA repositories
+│       │   └── service/                  ← ScoringService, GameService, LocationService, PlayerService
+│       ├── main/resources/
+│       │   ├── application.properties     ← Default local development configuration
+│       │   ├── application-prod.properties← Production profile (requires cloud env vars)
+│       │   ├── schema.sql                ← PostgreSQL schema DDL
+│       │   └── seed.sql                  ← Idempotent initial global locations seed
+│       └── test/java/com/geoguesser/     ← JUnit & scoring test suite
 │
-└── frontend/              ← JavaFX desktop client
-    └── src/main/java/com/geoguesser/
-        ├── App.java
-        ├── service/ApiClient.java
-        └── ui/screens/
-            ├── LoginScreen.java
-            ├── RegisterScreen.java
-            ├── GameScreen.java
-            └── LeaderboardScreen.java
+├── frontend/                             ← Web client (vanilla static assets)
+│   ├── index.html                        ← Semantic game layout & auth screens
+│   ├── style.css                         ← Dark theme design system & responsive layout
+│   ├── app.js                            ← Game engine, map handling, API client
+│   ├── config.js                         ← Configurable API URL configuration point
+│   └── countries.json                    ← Priority-ranked world country dataset
+│
+├── .gitignore                            ← Standard exclusions (build target, secrets, logs)
+└── README.md                             ← Project overview & deployment documentation
 ```
 
 ---
 
-## Setup Guide
+## 🛠️ Local Development Setup
 
 ### 1. Prerequisites
+- **Java 17+** (JDK 17)
+- **Maven 3.8+**
+- **PostgreSQL 15+** running locally on port 5432
+- **Mapbox Account** (free tier token for satellite imagery)
 
-- Java 17+
-- Maven
-- PostgreSQL 15+
-- Mapbox account (free tier is fine)
-
-### 2. Database
-
+### 2. Database Initialization
+Create a database named `geoguesser`:
 ```bash
-psql -U postgres
-CREATE DATABASE geoguesser;
-\q
+psql -U postgres -c "CREATE DATABASE geoguesser;"
 ```
+*(Hibernate automatically creates tables on startup, and `DataSeeder` seeds starter locations if empty. You can also optionally run `backend/src/main/resources/schema.sql` and `backend/src/main/resources/seed.sql`)*.
 
-Then run the schema:
-```bash
-psql -U postgres -d geoguesser -f backend/src/main/resources/schema.sql
-```
-
-### 3. Configure the Backend
-
-Edit `backend/src/main/resources/application.properties`:
-
+### 3. Local Secrets Configuration
+Create a private `backend/src/main/resources/application-local.properties` file (automatically ignored by Git):
 ```properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/geoguesser
-spring.datasource.username=postgres
-spring.datasource.password=YOUR_PASSWORD
-
-jwt.secret=GENERATE_WITH: openssl rand -base64 64
-
-mapbox.access-token=YOUR_MAPBOX_PUBLIC_TOKEN
+spring.datasource.password=YOUR_LOCAL_DB_PASSWORD
+mapbox.access-token=YOUR_MAPBOX_TOKEN
 ```
 
-### 4. Run the Backend
-
+### 4. Running the Backend
 ```bash
 cd backend
 mvn spring-boot:run
 ```
+The backend starts on `http://localhost:8080`.
 
-Backend starts on http://localhost:8080
-
-The DataSeeder auto-populates 10 starter locations on first run.
-
-### 5. Run the Frontend
-
+### 5. Running the Frontend
+Serve the `frontend/` directory with any static server:
 ```bash
-cd frontend
-mvn javafx:run
+# Example with Python
+python -m http.server 5500 --directory frontend
+
+# Or using Node
+npx serve frontend -p 5500
+```
+Open your browser at `http://localhost:5500`.
+
+---
+
+## ☁️ Production Deployment
+
+### 1. Backend Configuration
+For production hosting (AWS, Render, Heroku, Railway, Fly.io, etc.), activate the production profile:
+```bash
+SPRING_PROFILES_ACTIVE=prod
 ```
 
----
+When `SPRING_PROFILES_ACTIVE=prod` is set, `application-prod.properties` strictly requires the following environment variables (no development fallbacks are accepted):
 
-## API Endpoints
+| Environment Variable | Description | Example |
+|---|---|---|
+| `PORT` | Web server listening port | `8080` |
+| `DB_URL` | PostgreSQL JDBC connection URL | `jdbc:postgresql://db-host:5432/geoguesser` |
+| `DB_USERNAME` | PostgreSQL database user | `geoguesser_user` |
+| `DB_PASSWORD` | PostgreSQL database password | *Secret* |
+| `JWT_SECRET` | 256-bit+ cryptographic signing key | *Generate with `openssl rand -base64 64`* |
+| `MAPBOX_ACCESS_TOKEN` | Mapbox API public token | `pk.eyJ...` |
+| `CORS_ALLOWED_ORIGINS` | Deployed frontend origin(s) | `https://geoguesser.yourdomain.com` |
 
-| Method | Path                         | Auth? | Description            |
-|--------|------------------------------|-------|------------------------|
-| POST   | /api/auth/register           | No    | Create account         |
-| POST   | /api/auth/login              | No    | Login → JWT token      |
-| GET    | /api/location/random         | No    | Get random location    |
-| GET    | /api/location/random?difficulty=HARD | No | Filtered location |
-| GET    | /api/location/daily          | No    | Today's challenge      |
-| GET    | /api/location/batch?count=5  | No    | Multi-round game       |
-| POST   | /api/game/guess?playerId=1   | Yes   | Submit a guess         |
-| GET    | /api/game/history?playerId=1 | Yes   | Recent games           |
-| GET    | /api/player/leaderboard      | No    | Top 10 players         |
-| GET    | /api/player/{id}/stats       | Yes   | Player stats           |
-
----
-
-## Adding More Locations
-
-POST to `/api/location` with JSON:
-
-```json
-{
-  "latitude": 27.1751,
-  "longitude": 78.0421,
-  "country": "India",
-  "city": "Agra",
-  "difficulty": "MEDIUM"
-}
+Build the production jar:
+```bash
+cd backend
+mvn clean package -DskipTests=false
+# Generates target/geoguesser-backend-1.0.0.jar
 ```
 
-The `imageUrl` is auto-generated from Mapbox using the coordinates.
+Run in production:
+```bash
+java -jar -Dspring.profiles.active=prod target/geoguesser-backend-1.0.0.jar
+```
+
+### 2. Frontend Configuration
+The frontend connects to the backend without requiring manual `localStorage` configuration:
+1. In [frontend/config.js](frontend/config.js), set `API_URL`:
+   ```javascript
+   window.ENV = {
+     API_URL: 'https://api.yourdomain.com/api'
+   };
+   ```
+2. Deploy the `frontend/` folder to any static hosting provider (Vercel, Netlify, Cloudflare Pages, AWS S3 / CloudFront).
 
 ---
 
-## Scoring
+## 🎯 Game Features & Architecture
 
-| Distance    | Score          |
-|-------------|----------------|
-| < 1 km      | 5000 (perfect) |
-| 1–10 km     | 4500–5000      |
-| 10–50 km    | 3000–4500      |
-| 50–100 km   | 2000–3000      |
-| > 100 km    | max(0, 5000 – dist×2) |
-
-Plus up to **+500 time bonus** for guessing within 10 seconds.
-
----
-
-## What This Demonstrates (for interviews)
-
-- **REST API design** — clean endpoints, DTOs, proper HTTP status codes
-- **Spring Boot** — JPA, Security, JWT, Bean injection
-- **PostgreSQL** — schema design, native queries, indexing
-- **Haversine formula** — geospatial distance calculation
-- **JavaFX** — scene graph, async image loading, Timeline animation
-- **Full-stack integration** — JavaFX ↔ Spring Boot over HTTP
-- **Auth flow** — registration, BCrypt hashing, JWT tokens
-
-
-
-## Environment Variables
-
-Create a local configuration using the following variables:
-
-- DB_URL
-- DB_USERNAME
-- DB_PASSWORD
-- JWT_SECRET
-- MAPBOX_ACCESS_TOKEN
+- **Satellite Imagery**: Coordinates are converted to Mapbox Static Satellite imagery centered precisely on geographical landmarks.
+- **Floating Interactive Minimap**:
+  - Collapsed size `360 × 230 px`, anchored at the lower-right.
+  - Expands smoothly on hover or via touch toggle to `min(700px, 85vw) × min(500px, 70vh)`.
+  - Spatial collision detection for country labels preventing overlapping text.
+- **Five-Round Match Flow**:
+  - Distance calculated via the Haversine formula.
+  - Scores strictly bounded between 0 and 5,000 per round (up to 25,000 total).
+  - Time bonus for rapid guesses within 10 seconds.
+- **Leaderboard & Match History**: Persisted in PostgreSQL with player stat tracking and personal best records.

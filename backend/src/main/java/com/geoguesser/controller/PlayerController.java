@@ -4,6 +4,8 @@ import com.geoguesser.dto.LeaderboardDTO;
 import com.geoguesser.dto.PlayerStatsDTO;
 import com.geoguesser.service.PlayerService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,8 +25,12 @@ public class PlayerController {
         return ResponseEntity.ok(playerService.getTopLeaderboard());
     }
 
-    @GetMapping("/{id}/stats")
-    public ResponseEntity<PlayerStatsDTO> stats(@PathVariable Long id) {
-        return ResponseEntity.ok(playerService.getPlayerStats(id));
+    @GetMapping("/me/stats")
+    public ResponseEntity<PlayerStatsDTO> stats(
+            @AuthenticationPrincipal UserDetails user) {
+
+        return ResponseEntity.ok(
+                playerService.getPlayerStats(user.getUsername())
+        );
     }
 }

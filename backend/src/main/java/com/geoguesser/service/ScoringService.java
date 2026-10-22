@@ -48,11 +48,24 @@ public class ScoringService {
         }
     }
 
+    /**
+     * Applies an optional time bonus based on how quickly the guess was submitted.
+     * Enforces the game scoring contract:
+     * - Maximum 5,000 points per round (base score + time bonus is strictly capped at MAX_SCORE).
+     * - A standard 5-round game total will never exceed 25,000 points.
+     *
+     * @param baseScore The distance-based score (0 to 5,000).
+     * @param secondsTaken Time taken to guess in seconds.
+     * @return Final round score guaranteed to be in the range [0, 5000].
+     */
     public int applyTimeBonus(int baseScore, int secondsTaken) {
-        if (secondsTaken <= 0 || secondsTaken >= 120) return baseScore;
+        int clampedBase = Math.min(MAX_SCORE, Math.max(0, baseScore));
+        if (secondsTaken <= 0 || secondsTaken >= 120) {
+            return clampedBase;
+        }
 
         int timeBonus = (int) (500 * (1.0 - (secondsTaken / 120.0)));
-        return baseScore + timeBonus;
+        return Math.min(MAX_SCORE, clampedBase + timeBonus);
     }
 
     public String getPerformanceLabel(double distanceKm) {

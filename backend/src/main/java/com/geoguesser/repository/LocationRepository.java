@@ -20,8 +20,14 @@ public interface LocationRepository extends JpaRepository<Location, Long> {
             nativeQuery = true)
     Optional<Location> findRandomLocationByDifficulty(String difficulty);
 
-    // Get today's daily challenge (same location for everyone today)
-    @Query(value = "SELECT * FROM locations WHERE id = (SELECT (EXTRACT(DOY FROM CURRENT_DATE)::INTEGER % COUNT(*)) + 1 FROM locations)",
+    // Get today's daily challenge (same deterministic location for everyone today, robust to non-contiguous IDs and deletions)
+    @Query(value = "SELECT l.* FROM locations l " +
+                   "JOIN (" +
+                   "    SELECT id, ROW_NUMBER() OVER (ORDER BY id) - 1 AS row_idx, COUNT(*) OVER () AS total_count " +
+                   "    FROM locations" +
+                   ") ranked ON l.id = ranked.id " +
+                   "WHERE ranked.row_idx = (EXTRACT(DOY FROM CURRENT_DATE)::INTEGER % ranked.total_count) " +
+                   "LIMIT 1",
             nativeQuery = true)
     Optional<Location> findDailyChallengeLocation();
 

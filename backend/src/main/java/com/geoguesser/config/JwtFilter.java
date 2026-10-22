@@ -30,14 +30,19 @@ public class JwtFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        try {
-            String header = request.getHeader("Authorization");
+        String header = request.getHeader("Authorization");
 
-            if (header != null && header.startsWith("Bearer ")) {
-                String token = header.substring(7);
+        if (header != null && header.startsWith("Bearer ")) {
+            String token = header.substring(7);
 
-                if (jwtUtil.validateToken(token) && SecurityContextHolder.getContext().getAuthentication() == null) {
+            try {
+                if (jwtUtil.validateToken(token)
+                        && SecurityContextHolder.getContext().getAuthentication() == null) {
+
                     String username = jwtUtil.extractUsername(token);
+
+                    System.out.println("JWT username: " + username);
+
                     var userDetails = userDetailsService.loadUserByUsername(username);
 
                     var auth = new UsernamePasswordAuthenticationToken(
@@ -47,10 +52,15 @@ public class JwtFilter extends OncePerRequestFilter {
                     );
 
                     SecurityContextHolder.getContext().setAuthentication(auth);
+
+                    System.out.println("JWT authentication successful for: " + username);
                 }
+            } catch (Exception e) {
+                System.out.println("JWT authentication FAILED: " + e.getClass().getName());
+                System.out.println("JWT error: " + e.getMessage());
             }
-        } catch (Exception ignored) {
-            // Token parsing or lookup failed; proceed without setting authentication
+        } else {
+            System.out.println("No Bearer token found for: " + request.getRequestURI());
         }
 
         filterChain.doFilter(request, response);

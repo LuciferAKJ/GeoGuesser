@@ -2,7 +2,9 @@ package com.geoguesser.service;
 
 import com.geoguesser.dto.LeaderboardDTO;
 import com.geoguesser.dto.PlayerStatsDTO;
+import com.geoguesser.exception.EntityNotFoundException;
 import com.geoguesser.model.Player;
+import com.geoguesser.repository.GameRepository;
 import com.geoguesser.repository.PlayerRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,9 +16,11 @@ import java.util.List;
 public class PlayerService {
 
     private final PlayerRepository playerRepository;
+    private final GameRepository gameRepository;
 
-    public PlayerService(PlayerRepository playerRepository) {
+    public PlayerService(PlayerRepository playerRepository, GameRepository gameRepository) {
         this.playerRepository = playerRepository;
+        this.gameRepository = gameRepository;
     }
 
     @Transactional
@@ -37,9 +41,8 @@ public class PlayerService {
 
         for (int i = 0; i < topPlayers.size(); i++) {
             Player p = topPlayers.get(i);
-            // Fixed type alignment by passing standard integer ranking
             result.add(new LeaderboardDTO(
-                    (long) (i + 1),
+                    i + 1,
                     p.getUsername(),
                     p.getTotalScore(),
                     p.getGamesPlayed(),
@@ -50,16 +53,22 @@ public class PlayerService {
         return result;
     }
 
-    public PlayerStatsDTO getPlayerStats(Long playerId) {
-        Player p = playerRepository.findById(playerId)
-                .orElseThrow(() -> new RuntimeException("Player not found: " + playerId));
+    public PlayerStatsDTO getPlayerStats(String username) {
+        Player p = playerRepository.findByUsernameIgnoreCase(username)
+                .orElseThrow(() -> new EntityNotFoundException("Player not found: " + username));
 
-        // Fixed constructor parameter count alignment (added temporary 0.0 average score slot)
+        Double averageScore = gameRepository.findAverageScoreByPlayerId(p.getId());
+
+        if (averageScore == null) {
+            averageScore = 0.0;
+        }
+
         return new PlayerStatsDTO(
                 p.getUsername(),
                 p.getTotalScore(),
                 p.getGamesPlayed(),
-                p.getBestScore()
+                p.getBestScore(),
+                averageScore
         );
     }
 }
