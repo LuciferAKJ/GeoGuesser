@@ -120,4 +120,20 @@ class AuthControllerTest {
 
         verify(authService).resendVerification("user@example.com");
     }
+
+    @Test
+    @DisplayName("POST /api/auth/register returns 503 Service Unavailable when email service is unconfigured")
+    void testRegisterReturns503WhenEmailServiceUnconfigured() throws Exception {
+        RegisterRequest req = new RegisterRequest("newuser", "user@example.com", "secret123");
+        when(authService.register(any(RegisterRequest.class)))
+                .thenThrow(new IllegalStateException("Email service is not configured. Please contact the administrator."));
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.status", is(503)))
+                .andExpect(jsonPath("$.code", is("EMAIL_SERVICE_UNAVAILABLE")))
+                .andExpect(jsonPath("$.message", is("Email service is not configured. Please contact the administrator.")));
+    }
 }

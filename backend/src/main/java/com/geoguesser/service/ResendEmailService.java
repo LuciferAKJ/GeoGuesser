@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.geoguesser.exception.EmailDeliveryException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -31,10 +32,11 @@ public class ResendEmailService implements EmailService {
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
+    @Autowired
     public ResendEmailService(
             @Value("${resend.api-key:}") String apiKey,
             @Value("${resend.from:GeoGuesser <onboarding@resend.dev>}") String fromAddress,
-            @Value("${app.frontend-base-url:http://localhost:5500}") String frontendBaseUrl,
+            @Value("${app.frontend-base-url:}") String frontendBaseUrl,
             @Value("${app.email-verification-required:true}") boolean verificationRequired,
             ObjectMapper objectMapper
     ) {
@@ -52,19 +54,20 @@ public class ResendEmailService implements EmailService {
     ) {
         this.apiKey = apiKey != null ? apiKey.trim() : "";
         this.fromAddress = (fromAddress != null && !fromAddress.isBlank()) ? fromAddress.trim() : "GeoGuesser <onboarding@resend.dev>";
-        this.frontendBaseUrl = (frontendBaseUrl != null && !frontendBaseUrl.isBlank()) ? frontendBaseUrl.trim() : "http://localhost:5500";
+        this.frontendBaseUrl = frontendBaseUrl != null ? frontendBaseUrl.trim() : "";
         this.verificationRequired = verificationRequired;
         this.objectMapper = objectMapper;
         this.httpClient = httpClient;
 
-        if (this.verificationRequired && this.apiKey.isEmpty()) {
-            log.warn("Resend API key is not configured. Email verification is enabled and will reject registrations until RESEND_API_KEY is provided.");
+        if (this.verificationRequired && !isConfigured()) {
+            log.warn("Resend email configuration is incomplete (apiKey present: {}, frontendBaseUrl present: {}). Email verification is enabled and will reject registrations until configuration is provided.",
+                    !this.apiKey.isEmpty(), !this.frontendBaseUrl.isEmpty());
         }
     }
 
     @Override
     public boolean isConfigured() {
-        return !apiKey.isEmpty();
+        return !apiKey.isEmpty() && !frontendBaseUrl.isEmpty();
     }
 
     @Override
@@ -79,8 +82,9 @@ public class ResendEmailService implements EmailService {
             return;
         }
 
-        if (apiKey.isEmpty()) {
-            log.error("Cannot dispatch verification email: RESEND_API_KEY environment variable is not configured.");
+        if (!isConfigured()) {
+            log.error("Cannot dispatch verification email: Resend email configuration is incomplete (apiKey present: {}, frontendBaseUrl present: {}).",
+                    !apiKey.isEmpty(), !frontendBaseUrl.isEmpty());
             throw new IllegalStateException("Email service is not configured. Please contact the administrator.");
         }
 

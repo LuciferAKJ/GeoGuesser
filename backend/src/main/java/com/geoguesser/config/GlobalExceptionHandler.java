@@ -52,6 +52,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException ex, WebRequest request) {
         Map<String, Object> body = new HashMap<>();
         body.put("timestamp", LocalDateTime.now());
+
+        if (ex.getMessage() != null && ex.getMessage().contains("Email service is not configured")) {
+            body.put("status", HttpStatus.SERVICE_UNAVAILABLE.value());
+            body.put("code", "EMAIL_SERVICE_UNAVAILABLE");
+            body.put("error", ex.getMessage());
+            body.put("message", ex.getMessage());
+            body.put("path", request.getDescription(false).replace("uri=", ""));
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
+        }
+
         body.put("status", HttpStatus.BAD_REQUEST.value());
         body.put("message", ex.getMessage());
         body.put("path", request.getDescription(false).replace("uri=", ""));

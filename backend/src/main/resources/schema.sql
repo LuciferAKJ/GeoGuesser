@@ -12,8 +12,12 @@ CREATE TABLE IF NOT EXISTS players (
 );
 
 -- Idempotent migration for existing players: treat pre-existing accounts as verified
-ALTER TABLE players ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT TRUE;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
+UPDATE players SET is_verified = TRUE WHERE is_verified IS NULL AND (games_played > 0 OR total_score > 0);
+UPDATE players SET is_verified = TRUE WHERE is_verified IS NULL AND id NOT IN (SELECT DISTINCT player_id FROM verification_tokens);
+UPDATE players SET is_verified = FALSE WHERE is_verified IS NULL;
 ALTER TABLE players ALTER COLUMN is_verified SET DEFAULT FALSE;
+ALTER TABLE players ALTER COLUMN is_verified SET NOT NULL;
 
 CREATE TABLE IF NOT EXISTS verification_tokens (
     id BIGSERIAL PRIMARY KEY,
