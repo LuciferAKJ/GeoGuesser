@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -22,6 +23,9 @@ import java.util.concurrent.ConcurrentSkipListSet;
  *
  * Utilizes a persistent PostgreSQL schema_migrations ledger to ensure one-time
  * legacy migrations run strictly once, keeping new registrations unverified by default.
+ *
+ * Uses a locally constructed DataSourceTransactionManager to avoid dependency cycles
+ * with Spring Boot's JPA PlatformTransactionManager / EntityManagerFactory.
  */
 @Component("databaseMigrationRunner")
 @Order(1)
@@ -35,15 +39,21 @@ public class DatabaseMigrationRunner implements CommandLineRunner {
     private final PlatformTransactionManager transactionManager;
     private final Set<String> appliedMigrations = new ConcurrentSkipListSet<>();
 
+    @Autowired
     public DatabaseMigrationRunner(JdbcTemplate jdbcTemplate) {
-        this(jdbcTemplate, null);
+        this.jdbcTemplate = jdbcTemplate;
+        this.transactionManager = (jdbcTemplate != null && jdbcTemplate.getDataSource() != null)
+                ? new DataSourceTransactionManager(jdbcTemplate.getDataSource())
+                : null;
     }
 
-    @Autowired
-    public DatabaseMigrationRunner(JdbcTemplate jdbcTemplate,
-                                  @Autowired(required = false) PlatformTransactionManager transactionManager) {
+    public DatabaseMigrationRunner(JdbcTemplate jdbcTemplate, PlatformTransactionManager transactionManager) {
         this.jdbcTemplate = jdbcTemplate;
         this.transactionManager = transactionManager;
+    }
+
+    public PlatformTransactionManager getTransactionManager() {
+        return this.transactionManager;
     }
 
     @PostConstruct
@@ -92,16 +102,13 @@ public class DatabaseMigrationRunner implements CommandLineRunner {
             );
             appliedMigrations.add(version);
         } catch (Exception e) {
-            try {
-                jdbcTemplate.update(
-                        "INSERT INTO schema_migrations (version, description) VALUES (?, ?);",
-                        version,
-                        description
-                );
-                appliedMigrations.add(version);
-            } catch (Exception ex) {
-                log.debug("Note recording migration version {}: {}", version, ex.getMessage());
-            }
+            // Fallback for database engines that do not support ON CONFLICT
+            jdbcTemplate.update(
+                    "INSERT INTO schema_migrations (version, description) VALUES (?, ?);",
+                    version,
+                    description
+            );
+            appliedMigrations.add(version);
         }
     }
 
