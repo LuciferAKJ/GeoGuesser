@@ -825,7 +825,8 @@ async function register() {
 
 async function resendVerification() {
   if (isSubmittingResend || resendCooldownRemaining > 0) return;
-  const input = val('resend-input');
+  const rawInput = val('resend-input');
+  const input = rawInput ? rawInput.trim() : '';
 
   if (!input) return msg('resend-msg', 'Please enter your email or username', 'red');
 
@@ -838,14 +839,15 @@ async function resendVerification() {
 
   try {
     const res = await api('/auth/resend-verification', 'POST', {
-      usernameOrEmail: input
+      emailOrUsername: input
     });
 
     msg('resend-msg', res.message || 'If an account exists, a verification email has been sent.', 'green');
     startResendCooldown(60);
   } catch (err) {
-    msg('resend-msg', err.message, 'red');
-    if (err.message && err.message.toLowerCase().includes('cooldown') || err.status === 429) {
+    const errorText = err && err.message ? err.message : 'Unable to request verification email. Please try again later.';
+    msg('resend-msg', errorText, 'red');
+    if ((errorText.toLowerCase().includes('cooldown')) || (err && err.status === 429)) {
       startResendCooldown(60);
     }
   } finally {
