@@ -49,6 +49,10 @@ public class Player {
     @Column(name = "best_score")
     private Integer bestScore = 0;
 
+    @Column(name = "is_verified", nullable = false)
+    @Builder.Default
+    private Boolean isVerified = false;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -56,9 +60,18 @@ public class Player {
     private List<Game> games;
 
     public Player(String username, String email, String passwordHash) {
+        this(username, email, passwordHash, false);
+    }
+
+    public Player(String username, String email, String passwordHash, Boolean isVerified) {
         this.username = username;
         this.email = email;
         this.passwordHash = passwordHash;
+        this.isVerified = isVerified != null ? isVerified : false;
+    }
+
+    public boolean isAccountVerified() {
+        return this.isVerified == null || Boolean.TRUE.equals(this.isVerified);
     }
 
     @PrePersist

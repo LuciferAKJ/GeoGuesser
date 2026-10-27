@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Privacy Policy — GeoGuesser</title>
+  <meta name="description" content="GeoGuesser privacy policy detailing collected account data, email verification, gameplay statistics, and local storage usage."/>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    body {
+      overflow-y: auto;
+      height: auto;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px;
+    }
+    .privacy-container {
+      max-width: 760px;
+      width: 100%;
+      background: var(--bg-card-glass);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 40px 32px;
+      box-shadow: var(--shadow-lg);
+    }
+    .privacy-container h1 {
+      font-size: 2rem;
+      color: var(--accent-crimson);
+      margin-bottom: 6px;
+    }
+    .privacy-container .updated {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+    .privacy-section {
+      margin-bottom: 24px;
+    }
+    .privacy-section h2 {
+      font-size: 1.25rem;
+      color: #fff;
+      margin-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 6px;
+    }
+    .privacy-section p, .privacy-section li {
+      font-size: 0.92rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    .privacy-section ul {
+      margin-left: 20px;
+      margin-top: 8px;
+    }
+    .privacy-section li {
+      margin-bottom: 6px;
+    }
+    .privacy-back-btn {
+      display: inline-flex;
+      margin-top: 16px;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <main class="privacy-container" role="main">
+    <a href="index.html" class="btn-ghost privacy-back-btn" aria-label="Return to GeoGuesser Game">
+      ← Return to GeoGuesser
+    </a>
+
+    <h1 style="margin-top:20px;">🌍 GeoGuesser Privacy Policy</h1>
+    <p class="updated">Last updated: October 2026</p>
+
+    <section class="privacy-section">
+      <h2>1. Overview</h2>
+      <p>
+        GeoGuesser is a web-based educational geography challenge application. We respect your privacy and believe in full transparency regarding how account data, gameplay information, and browser storage are handled.
+      </p>
+    </section>
+
+    <section class="privacy-section">
+      <h2>2. Information We Collect</h2>
+      <p>When you create an account and play GeoGuesser, we collect the following minimal data:</p>
+      <ul>
+        <li><strong>Account Credentials:</strong> A chosen username and email address. Passwords are cryptographically hashed using standard BCrypt before storage; plain-text passwords are never saved or accessible.</li>
+        <li><strong>Email Verification:</strong> Single-use cryptographic verification tokens generated upon registration or resend requests. We store only SHA-256 hashes of verification tokens with a 30-minute expiry window.</li>
+        <li><strong>Gameplay History &amp; Scores:</strong> Guess coordinates, calculated distance errors (km), round elapsed times (seconds), points earned, and overall leaderboard standing.</li>
+      </ul>
+    </section>
+
+    <section class="privacy-section">
+      <h2>3. Browser Storage (Cookies &amp; Local Storage)</h2>
+      <p>GeoGuesser does not use tracking or advertising cookies. We use standard browser web storage for essential game operations:</p>
+      <ul>
+        <li><strong>Local Storage (<code>localStorage</code>):</strong> Stores your active JWT authentication token, player ID, and username so you remain authenticated across page reloads. Logging out immediately clears this data.</li>
+        <li><strong>Session Storage (<code>sessionStorage</code>):</strong> Stores recently seen location identifiers (<code>geoguesser_recent_locations</code>) exclusively during an active browser session to prevent duplicate round locations. This is automatically purged when you close the browser tab.</li>
+      </ul>
+    </section>
+
+    <section class="privacy-section">
+      <h2>4. Third-Party Services</h2>
+      <p>To provide game functionality, GeoGuesser interfaces with select external services:</p>
+      <ul>
+        <li><strong>Resend:</strong> Used solely to send transactional account activation emails. Email addresses are transmitted over encrypted HTTPS to deliver activation links.</li>
+        <li><strong>Map Tile Providers (Esri &amp; OpenStreetMap / Leaflet):</strong> Used to render the interactive world minimap tiles.</li>
+        <li><strong>Mapbox Static Imagery:</strong> Used to load high-resolution satellite views for gameplay rounds.</li>
+      </ul>
+    </section>
+
+    <section class="privacy-section">
+      <h2>5. Data Retention &amp; Security</h2>
+      <p>
+        All communications between your browser and our backend use HTTPS. Database records are protected by parameterized database queries, token hashing, and strict authorization filters. You may clear your session or local credentials at any time by selecting "Logout".
+      </p>
+    </section>
+
+    <a href="index.html" class="btn-primary" style="text-decoration:none; margin-top:20px;">
+      ← Back to Game
+    </a>
+  </main>
+</body>
+</html>

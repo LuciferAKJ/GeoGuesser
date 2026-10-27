@@ -38,6 +38,12 @@ public interface LocationRepository extends JpaRepository<Location, Long> {
     @Query(value = "SELECT * FROM locations ORDER BY RANDOM() LIMIT :count", nativeQuery = true)
     List<Location> findRandomLocations(int count);
 
+    // Get N random locations excluding specific IDs
+    @Query(value = "SELECT * FROM locations WHERE id NOT IN (:excludeIds) ORDER BY RANDOM() LIMIT :count", nativeQuery = true)
+    List<Location> findRandomLocationsExcluding(
+            @org.springframework.data.repository.query.Param("excludeIds") List<Long> excludeIds,
+            @org.springframework.data.repository.query.Param("count") int count);
+
     long countByDifficulty(Location.Difficulty difficulty);
 
     List<Location> findTop20ByOrderByTimesPlayedAsc();

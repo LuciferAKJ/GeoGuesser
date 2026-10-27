@@ -50,14 +50,17 @@ public class LocationController {
 
     @GetMapping("/batch")
     public ResponseEntity<List<Map<String, Object>>> getBatchLocations(
-            @RequestParam(defaultValue = "5") @Min(1) @Max(20) int count) {
+            @RequestParam(defaultValue = "5") @Min(1) @Max(20) int count,
+            @RequestParam(required = false) List<Long> excludeIds) {
 
-        List<Map<String, Object>> locations = locationService.getRandomLocations(count)
+        List<Map<String, Object>> locations = locationService.getRandomLocationsWithExclusions(count, excludeIds)
                 .stream()
-                .map(loc -> Map.<String, Object>of(
-                        "id", loc.getId(),
-                        "imageUrl", loc.getImageUrl()
-                ))
+                .map(loc -> {
+                    Map<String, Object> map = new java.util.HashMap<>();
+                    map.put("id", loc.getId());
+                    map.put("imageUrl", loc.getImageUrl() != null ? loc.getImageUrl() : "");
+                    return map;
+                })
                 .toList();
 
         return ResponseEntity.ok(locations);
