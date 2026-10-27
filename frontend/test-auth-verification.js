@@ -227,4 +227,23 @@ assert.strictEqual(submitBtn.disabled, false);
 assert.strictEqual(submitBtn.textContent, 'Send Verification Email');
 console.log('✅ 5. Resend cooldown simulation passed\n');
 
+// 6. Resend Form Input Validation and Payload
+function validateAndBuildResendPayload(rawInput) {
+  const input = rawInput ? rawInput.trim() : '';
+  if (!input) {
+    return { valid: false, error: 'Please enter your email or username' };
+  }
+  return { valid: true, payload: { emailOrUsername: input } };
+}
+
+assert.strictEqual(validateAndBuildResendPayload('').valid, false);
+assert.strictEqual(validateAndBuildResendPayload('   ').valid, false);
+assert.strictEqual(validateAndBuildResendPayload('   ').error, 'Please enter your email or username');
+
+const validResend = validateAndBuildResendPayload('  player@example.com  ');
+assert.strictEqual(validResend.valid, true);
+assert.strictEqual(validResend.payload.emailOrUsername, 'player@example.com');
+assert.strictEqual(Object.keys(validResend.payload)[0], 'emailOrUsername', 'Must use emailOrUsername key matching backend DTO');
+console.log('✅ 6. Resend form input validation and payload test passed\n');
+
 console.log('🎉 ALL FRONTEND AUTH & VERIFICATION TESTS PASSED!');

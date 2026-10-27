@@ -1,3 +1,10 @@
+-- Migration ledger table
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version VARCHAR(64) PRIMARY KEY,
+    description VARCHAR(255) NOT NULL,
+    applied_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Drop statements or rely on IF NOT EXISTS for safe initial execution
 CREATE TABLE IF NOT EXISTS players (
     id BIGSERIAL PRIMARY KEY,
@@ -11,14 +18,7 @@ CREATE TABLE IF NOT EXISTS players (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Idempotent migration for existing players: treat pre-existing accounts as verified
-ALTER TABLE players ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
-UPDATE players SET is_verified = TRUE WHERE is_verified IS NULL AND (games_played > 0 OR total_score > 0);
-UPDATE players SET is_verified = TRUE WHERE is_verified IS NULL AND id NOT IN (SELECT DISTINCT player_id FROM verification_tokens);
-UPDATE players SET is_verified = FALSE WHERE is_verified IS NULL;
-ALTER TABLE players ALTER COLUMN is_verified SET DEFAULT FALSE;
-ALTER TABLE players ALTER COLUMN is_verified SET NOT NULL;
-
+-- Base table verification_tokens (must exist before querying it for legacy backfill)
 CREATE TABLE IF NOT EXISTS verification_tokens (
     id BIGSERIAL PRIMARY KEY,
     token_hash VARCHAR(64) NOT NULL UNIQUE,
@@ -30,6 +30,24 @@ CREATE TABLE IF NOT EXISTS verification_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_verification_tokens_hash ON verification_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_verification_tokens_player ON verification_tokens(player_id);
+
+-- Idempotent column addition for existing databases
+ALTER TABLE players ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
+
+-- One-time legacy account backfill (executed only when not recorded in migration ledger)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version = 'V2__legacy_account_verification_backfill') THEN
+        UPDATE players SET is_verified = TRUE WHERE (games_played > 0 OR total_score > 0 OR id IN (SELECT DISTINCT player_id FROM games));
+        UPDATE players SET is_verified = TRUE WHERE id NOT IN (SELECT DISTINCT player_id FROM verification_tokens);
+        INSERT INTO schema_migrations (version, description) VALUES ('V2__legacy_account_verification_backfill', 'One-time legacy player account verification backfill')
+        ON CONFLICT (version) DO NOTHING;
+    END IF;
+END $$;
+
+UPDATE players SET is_verified = FALSE WHERE is_verified IS NULL;
+ALTER TABLE players ALTER COLUMN is_verified SET DEFAULT FALSE;
+ALTER TABLE players ALTER COLUMN is_verified SET NOT NULL;
 
 CREATE TABLE IF NOT EXISTS locations (
     id BIGSERIAL PRIMARY KEY,

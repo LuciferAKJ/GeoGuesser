@@ -122,6 +122,48 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("POST /api/auth/resend-verification with populated emailOrUsername passes validation and reaches service")
+    void testResendVerificationWithPopulatedJsonReachesService() throws Exception {
+        when(authService.resendVerification("explorer@example.com"))
+                .thenReturn(new MessageResponse("A new verification link has been sent to your email."));
+
+        mockMvc.perform(post("/api/auth/resend-verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"emailOrUsername\":\"explorer@example.com\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message", is("A new verification link has been sent to your email.")));
+
+        verify(authService).resendVerification("explorer@example.com");
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/resend-verification with JSON alias usernameOrEmail passes validation and reaches service")
+    void testResendVerificationWithAliasUsernameOrEmailReachesService() throws Exception {
+        when(authService.resendVerification("player_one"))
+                .thenReturn(new MessageResponse("If an account exists, a link has been sent."));
+
+        mockMvc.perform(post("/api/auth/resend-verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"usernameOrEmail\":\"player_one\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message", is("If an account exists, a link has been sent.")));
+
+        verify(authService).resendVerification("player_one");
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/resend-verification with blank input returns 400 Bad Request")
+    void testResendVerificationBlankInputReturnsBadRequest() throws Exception {
+        mockMvc.perform(post("/api/auth/resend-verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"emailOrUsername\":\"   \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", is("emailOrUsername: Email or username is required")));
+
+        verify(authService, never()).resendVerification(anyString());
+    }
+
+    @Test
     @DisplayName("POST /api/auth/register returns 503 Service Unavailable when email service is unconfigured")
     void testRegisterReturns503WhenEmailServiceUnconfigured() throws Exception {
         RegisterRequest req = new RegisterRequest("newuser", "user@example.com", "secret123");

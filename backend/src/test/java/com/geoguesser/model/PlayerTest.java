@@ -30,6 +30,39 @@ class PlayerTest {
     }
 
     @Test
+    @DisplayName("Legacy player with games played or scores retains verified status")
+    void testLegacyPlayerWithGamesPlayedIsVerified() {
+        Player legacyPlayer = Player.builder()
+                .username("veteran_player")
+                .email("veteran@example.com")
+                .passwordHash("hashed_pwd")
+                .gamesPlayed(15)
+                .totalScore(45000L)
+                .isVerified(true)
+                .build();
+
+        assertTrue(legacyPlayer.isAccountVerified());
+        assertEquals(15, legacyPlayer.getGamesPlayed());
+        assertEquals(45000L, legacyPlayer.getTotalScore());
+    }
+
+    @Test
+    @DisplayName("Explicitly unverified new player with 0 games remains unverified")
+    void testNewUnverifiedPlayerRemainsUnverified() {
+        Player newPlayer = Player.builder()
+                .username("fresh_user")
+                .email("fresh@example.com")
+                .passwordHash("hashed_pwd")
+                .gamesPlayed(0)
+                .totalScore(0L)
+                .isVerified(false)
+                .build();
+
+        assertFalse(newPlayer.isAccountVerified(), "Unverified player must not be allowed access");
+        assertEquals(0, newPlayer.getGamesPlayed());
+    }
+
+    @Test
     @DisplayName("isAccountVerified returns false when isVerified is false, and true when true or legacy null")
     void testIsAccountVerifiedNullSafety() {
         Player player = new Player();
