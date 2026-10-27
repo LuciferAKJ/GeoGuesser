@@ -202,6 +202,83 @@ class DatabaseMigrationRunnerTest {
     }
 
     @Test
+    @DisplayName("Constructs a local DataSourceTransactionManager when DataSource is present, without requiring JPA transaction manager")
+    void testPreJpaMigrationConstructsLocalJdbcTransactionManager() {
+        javax.sql.DataSource dataSource = mock(javax.sql.DataSource.class);
+        when(jdbcTemplate.getDataSource()).thenReturn(dataSource);
+
+        DatabaseMigrationRunner runner = new DatabaseMigrationRunner(jdbcTemplate);
+
+        assertNotNull(runner.getTransactionManager());
+        assertTrue(runner.getTransactionManager() instanceof org.springframework.jdbc.datasource.DataSourceTransactionManager);
+    }
+
+    @Test
+    @DisplayName("Migration rollback on failure propagates error and does not record version in ledger")
+    void testMigrationRollbackOnFailurePropagatesAndDoesNotRecordVersion() {
+        when(jdbcTemplate.queryForObject(
+                contains("SELECT COUNT(*) FROM schema_migrations WHERE version = ?"),
+                eq(Integer.class),
+                eq(DatabaseMigrationRunner.MIGRATION_VERSION_LEGACY_BACKFILL)
+        )).thenReturn(0);
+
+        // Simulate failure during legacy backfill query 5b
+        lenient().doThrow(new org.springframework.dao.DataIntegrityViolationException("Simulated constraint violation in backfill"))
+                .when(jdbcTemplate).execute(contains("UPDATE players SET is_verified = TRUE WHERE id NOT IN (SELECT DISTINCT player_id FROM verification_tokens)"));
+
+        when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
+
+        DatabaseMigrationRunner runner = new DatabaseMigrationRunner(jdbcTemplate, transactionManager);
+        assertDoesNotThrow(runner::migrateDatabase);
+
+        // Verify rollback was triggered on transactionManager
+        verify(transactionManager).rollback(transactionStatus);
+        verify(transactionManager, never()).commit(transactionStatus);
+
+        // Verify ledger entry was NEVER inserted
+        verify(jdbcTemplate, never()).update(
+                contains("INSERT INTO schema_migrations"),
+                eq(DatabaseMigrationRunner.MIGRATION_VERSION_LEGACY_BACKFILL),
+                anyString()
+        );
+
+        // Verify version was NOT added to in-memory set
+        assertFalse(runner.isMigrationApplied(DatabaseMigrationRunner.MIGRATION_VERSION_LEGACY_BACKFILL));
+    }
+
+    @Test
+    @DisplayName("After rollback on first run, subsequent run retries legacy backfill and succeeds once issue is resolved")
+    void testMigrationRepeatabilityAfterRollback() {
+        when(jdbcTemplate.queryForObject(
+                contains("SELECT COUNT(*) FROM schema_migrations WHERE version = ?"),
+                eq(Integer.class),
+                eq(DatabaseMigrationRunner.MIGRATION_VERSION_LEGACY_BACKFILL)
+        )).thenReturn(0);
+
+        // Run 1: Failure during backfill, Run 2: Success
+        lenient().doThrow(new org.springframework.dao.DataIntegrityViolationException("Temporary failure"))
+                .doNothing()
+                .when(jdbcTemplate).execute(contains("UPDATE players SET is_verified = TRUE WHERE id NOT IN (SELECT DISTINCT player_id FROM verification_tokens)"));
+
+        when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
+
+        DatabaseMigrationRunner runner = new DatabaseMigrationRunner(jdbcTemplate, transactionManager);
+        // First attempt fails and rolls back
+        runner.migrateDatabase();
+        verify(transactionManager, times(1)).rollback(transactionStatus);
+        assertFalse(runner.isMigrationApplied(DatabaseMigrationRunner.MIGRATION_VERSION_LEGACY_BACKFILL));
+
+        // Second attempt succeeds and commits
+        runner.migrateDatabase();
+        verify(transactionManager, times(1)).commit(transactionStatus);
+        verify(jdbcTemplate, times(1)).update(
+                contains("INSERT INTO schema_migrations (version, description)"),
+                eq(DatabaseMigrationRunner.MIGRATION_VERSION_LEGACY_BACKFILL),
+                anyString()
+        );
+    }
+
+    @Test
     @DisplayName("DatabaseMigrationConfig properly sets dependency on databaseMigrationRunner")
     void testDatabaseMigrationConfigDependency() {
         DatabaseMigrationConfig config = new DatabaseMigrationConfig();
