@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#162447" />
+      <stop offset="50%" stop-color="#0e1726" />
+      <stop offset="100%" stop-color="#070c14" />
+    </radialGradient>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff5277" />
+      <stop offset="100%" stop-color="#e94560" />
+    </linearGradient>
+    <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bgGlow)"/>
+
+  <!-- Satellite Grid pattern overlay -->
+  <g stroke="rgba(59, 130, 246, 0.08)" stroke-width="1.5">
+    <line x1="100" y1="0" x2="100" y2="630" />
+    <line x1="250" y1="0" x2="250" y2="630" />
+    <line x1="400" y1="0" x2="400" y2="630" />
+    <line x1="550" y1="0" x2="550" y2="630" />
+    <line x1="700" y1="0" x2="700" y2="630" />
+    <line x1="850" y1="0" x2="850" y2="630" />
+    <line x1="1000" y1="0" x2="1000" y2="630" />
+    <line x1="1150" y1="0" x2="1150" y2="630" />
+    <line x1="0" y1="80" x2="1200" y2="80" />
+    <line x1="0" y1="180" x2="1200" y2="180" />
+    <line x1="0" y1="280" x2="1200" y2="280" />
+    <line x1="0" y1="380" x2="1200" y2="380" />
+    <line x1="0" y1="480" x2="1200" y2="480" />
+    <line x1="0" y1="580" x2="1200" y2="580" />
+  </g>
+
+  <!-- Content Group -->
+  <g transform="translate(600, 290)" text-anchor="middle">
+    <!-- Globe Icon -->
+    <text y="-80" font-size="76" font-family="'Segoe UI Emoji', sans-serif">🌍</text>
+
+    <!-- Main Title -->
+    <text y="0" font-size="72" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-weight="800" fill="url(#textGrad)" letter-spacing="-1">GeoGuesser</text>
+
+    <!-- Subtitle / Tagline -->
+    <text y="60" font-size="28" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-weight="500" fill="#94a3b8">
+      Explore the world via satellite imagery &amp; test your geography instincts
+    </text>
+
+    <!-- Badges Row -->
+    <g transform="translate(0, 130)">
+      <rect x="-240" y="-22" width="140" height="44" rx="22" fill="rgba(34, 197, 94, 0.15)" stroke="rgba(34, 197, 94, 0.4)" stroke-width="1.5"/>
+      <text x="-170" y="6" font-size="16" font-family="'Plus Jakarta Sans', sans-serif" font-weight="700" fill="#4ade80">5 ROUNDS</text>
+
+      <rect x="-70" y="-22" width="140" height="44" rx="22" fill="rgba(59, 130, 246, 0.15)" stroke="rgba(59, 130, 246, 0.4)" stroke-width="1.5"/>
+      <text x="0" y="6" font-size="16" font-family="'Plus Jakarta Sans', sans-serif" font-weight="700" fill="#93c5fd">GLOBAL MAP</text>
+
+      <rect x="100" y="-22" width="140" height="44" rx="22" fill="rgba(245, 197, 24, 0.15)" stroke="rgba(245, 197, 24, 0.4)" stroke-width="1.5"/>
+      <text x="170" y="6" font-size="16" font-family="'Plus Jakarta Sans', sans-serif" font-weight="700" fill="#facc15">LEADERBOARD</text>
+    </g>
+  </g>
+</svg>

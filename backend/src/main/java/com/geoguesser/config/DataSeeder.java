@@ -1,15 +1,19 @@
 package com.geoguesser.config;
 
 import com.geoguesser.model.Location;
-import com.geoguesser.model.Location.Difficulty;
 import com.geoguesser.repository.LocationRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 public class DataSeeder implements CommandLineRunner {
+
+    private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
 
     private final LocationRepository locationRepository;
 
@@ -19,22 +23,51 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (locationRepository.count() > 0) return;
+        seedLocationsIfMissing();
+    }
 
-        List<Location> locations = List.of(
-                new Location(48.8584, 2.2945, "France", "Paris", null, Difficulty.EASY),
-                new Location(40.7128, -74.0060, "USA", "New York", null, Difficulty.EASY),
-                new Location(51.5074, -0.1278, "UK", "London", null, Difficulty.EASY),
-                new Location(35.6762, 139.6503, "Japan", "Tokyo", null, Difficulty.MEDIUM),
-                new Location(-33.8688, 151.2093, "Australia", "Sydney", null, Difficulty.MEDIUM),
-                new Location(55.7558, 37.6173, "Russia", "Moscow", null, Difficulty.MEDIUM),
-                new Location(-22.9068, -43.1729, "Brazil", "Rio de Janeiro", null, Difficulty.MEDIUM),
-                new Location(1.3521, 103.8198, "Singapore", "Singapore", null, Difficulty.HARD),
-                new Location(-1.2921, 36.8219, "Kenya", "Nairobi", null, Difficulty.HARD),
-                new Location(64.1466, -21.9426, "Iceland", "Reykjavik", null, Difficulty.HARD)
-        );
+    public int seedLocationsIfMissing() {
+        List<Location> existing = locationRepository.findAll();
+        Set<String> existingCoords = existing.stream()
+                .map(l -> coordKey(l.getLatitude(), l.getLongitude()))
+                .collect(Collectors.toSet());
 
-        locationRepository.saveAll(locations);
-        System.out.println("Loaded default locations.");
+        List<Location> catalog = LocationCatalog.getCatalog();
+        List<Location> toInsert = catalog.stream()
+                .filter(l -> !existingCoords.contains(coordKey(l.getLatitude(), l.getLongitude())))
+                .toList();
+
+        int inserted = 0;
+        if (!toInsert.isEmpty()) {
+            locationRepository.saveAll(toInsert);
+            log.info("Seeded {} new locations. Total locations in database: {}",
+                    toInsert.size(), existing.size() + toInsert.size());
+            inserted = toInsert.size();
+        } else {
+            log.info("Location database is fully up to date. Total locations: {}", existing.size());
+        }
+
+        // Non-destructive zoom migration: sync per-location zoom levels from catalog for existing records
+        Map<String, Location> catalogMap = catalog.stream()
+                .collect(Collectors.toMap(l -> coordKey(l.getLatitude(), l.getLongitude()), l -> l, (a, b) -> a));
+        List<Location> toUpdate = new ArrayList<>();
+        for (Location ex : existing) {
+            Location cat = catalogMap.get(coordKey(ex.getLatitude(), ex.getLongitude()));
+            if (cat != null && cat.getZoom() != null && !cat.getZoom().equals(ex.getZoom())) {
+                ex.setZoom(cat.getZoom());
+                toUpdate.add(ex);
+            }
+        }
+        if (!toUpdate.isEmpty()) {
+            locationRepository.saveAll(toUpdate);
+            log.info("Updated zoom level for {} existing locations from catalog.", toUpdate.size());
+        }
+
+        return inserted;
+    }
+
+    private String coordKey(Double lat, Double lon) {
+        if (lat == null || lon == null) return "0.0000,0.0000";
+        return String.format(Locale.ROOT, "%.4f,%.4f", lat, lon);
     }
 }

@@ -15,12 +15,14 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
     Optional<Player> findByUsernameIgnoreCase(String username);
 
     Optional<Player> findByEmail(String email);
+    Optional<Player> findByEmailIgnoreCase(String email);
 
     boolean existsByUsername(String username);
 
     boolean existsByUsernameIgnoreCase(String username);
 
     boolean existsByEmail(String email);
+    boolean existsByEmailIgnoreCase(String email);
 
     // Spring Data automatically handles LIMIT 10 via method naming conventions
     List<Player> findTop10ByOrderByTotalScoreDesc();

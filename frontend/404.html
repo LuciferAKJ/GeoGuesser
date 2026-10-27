@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>404 — Page Not Found | GeoGuesser</title>
+  <meta name="description" content="The page you requested could not be found. Return to GeoGuesser to explore satellite locations."/>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css"/>
+  <style>
+    .not-found-card {
+      text-align: center;
+      max-width: 480px;
+      width: 90%;
+      margin: 0 auto;
+      padding: 48px 32px;
+    }
+    .not-found-badge {
+      display: inline-block;
+      font-size: 3.5rem;
+      margin-bottom: 12px;
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    .not-found-card h1 {
+      font-size: 2.2rem;
+      margin-bottom: 8px;
+    }
+    .not-found-card p {
+      color: var(--text-secondary);
+      font-size: 0.98rem;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .not-found-actions {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+    }
+  </style>
+</head>
+<body class="center">
+  <main class="card not-found-card" role="main">
+    <div class="not-found-badge" aria-hidden="true">🧭</div>
+    <h1>404 — Off the Map</h1>
+    <p>The coordinates you are navigating to do not exist or have moved. Let's get you back on track.</p>
+    <div class="not-found-actions">
+      <a href="index.html" class="btn-primary" style="text-decoration: none;">
+        🌍 Return to GeoGuesser
+      </a>
+    </div>
+  </main>
+</body>
+</html>

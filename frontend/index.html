@@ -3,7 +3,26 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>GeoGuesser</title>
+  <title>GeoGuesser — World Geography Satellite Guessing Game</title>
+  <meta name="description" content="Explore high-resolution satellite imagery, pinpoint mystery locations around the globe, and climb the leaderboard in this modern web geography challenge."/>
+  <meta name="keywords" content="geoguesser, geography game, satellite map, world trivia, map quiz, educational game"/>
+  <meta name="theme-color" content="#0B1220"/>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+
+  <!-- Open Graph / Social Sharing -->
+  <meta property="og:type" content="website"/>
+  <meta property="og:title" content="GeoGuesser — World Geography Satellite Guessing Game"/>
+  <meta property="og:description" content="Test your navigation skills with satellite imagery from around the world. Compete in 5 rounds and see your global ranking."/>
+  <meta property="og:image" content="og-image.svg"/>
+  <meta property="og:image:alt" content="GeoGuesser World Map Challenge"/>
+
+  <!-- Twitter Cards -->
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="GeoGuesser — Satellite Geography Game"/>
+  <meta name="twitter:description" content="Explore satellite imagery, pinpoint world locations, and compete on the global leaderboard."/>
+  <meta name="twitter:image" content="og-image.svg"/>
 
   <!-- Leaflet for the clickable world map -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -18,100 +37,158 @@
 </head>
 <body>
 
+<!-- Skip Link for Keyboard Navigation Accessibility -->
+<a href="#main-stage" class="skip-link">Skip to game content</a>
+
+<!-- Live Region for Screen Reader Announcements -->
+<div id="game-status-announcer" class="sr-only" aria-live="polite" role="status"></div>
+
+<!-- Toast Notification Container -->
+<div id="toast-container" class="toast-container" aria-live="assertive" role="region" aria-label="Notifications"></div>
+
 <!-- ── AUTH SCREEN ─────────────────────────────────── -->
 <div id="auth-screen" class="screen center">
-  <div class="card">
-    <h1>🌍 GeoGuesser</h1>
-    <p class="sub">How well do you know the world?</p>
+  <div class="card auth-card" role="region" aria-label="Authentication Card">
+    <header class="auth-header">
+      <h1 class="auth-title">🌍 GeoGuesser</h1>
+      <p class="sub">How well do you know the world?</p>
+    </header>
 
-    <div id="login-form" class="form-section">
-      <input id="l-user" type="text" placeholder="Username" autocomplete="username"/>
-      <input id="l-pass" type="password" placeholder="Password" autocomplete="current-password"/>
-      <button class="btn-primary" onclick="login()">Login</button>
+    <div id="login-form" class="form-section" role="form" aria-label="Sign In Form">
+      <div class="form-group">
+        <label for="l-user" class="input-label">Username</label>
+        <input id="l-user" type="text" placeholder="Enter username" autocomplete="username" aria-required="true" aria-describedby="l-msg"/>
+      </div>
+      <div class="form-group">
+        <label for="l-pass" class="input-label">Password</label>
+        <input id="l-pass" type="password" placeholder="Enter password" autocomplete="current-password" aria-required="true" aria-describedby="l-msg"/>
+      </div>
+      <button class="btn-primary" id="login-btn" onclick="login()">Login</button>
       <button class="btn-ghost" onclick="showRegister()">Create Account</button>
-      <p class="msg" id="l-msg"></p>
+      <p class="msg" id="l-msg" role="status" aria-live="polite"></p>
+      <div id="unverified-login-actions" style="display:none; text-align:center; margin-top:4px;">
+        <button class="btn-ghost btn-sm" onclick="showResendVerification(val('l-user'))" style="width:100%;">
+          ✉️ Resend Verification Email
+        </button>
+      </div>
     </div>
 
-    <div id="register-form" class="form-section" style="display:none">
-      <input id="r-user" type="text" placeholder="Username" autocomplete="username"/>
-      <input id="r-email" type="email" placeholder="Email" autocomplete="email"/>
-      <input id="r-pass" type="password" placeholder="Password" autocomplete="new-password"/>
-      <button class="btn-primary" onclick="register()">Register</button>
+    <div id="register-form" class="form-section" style="display:none" role="form" aria-label="Create Account Form">
+      <div class="form-group">
+        <label for="r-user" class="input-label">Username</label>
+        <input id="r-user" type="text" placeholder="3-30 characters" autocomplete="username" aria-required="true" aria-describedby="r-msg"/>
+      </div>
+      <div class="form-group">
+        <label for="r-email" class="input-label">Email Address</label>
+        <input id="r-email" type="email" placeholder="name@example.com" autocomplete="email" aria-required="true" aria-describedby="r-msg"/>
+      </div>
+      <div class="form-group">
+        <label for="r-pass" class="input-label">Password</label>
+        <input id="r-pass" type="password" placeholder="Minimum 6 characters" autocomplete="new-password" aria-required="true" aria-describedby="r-msg"/>
+      </div>
+      <button class="btn-primary" id="register-btn" onclick="register()">Create Account</button>
       <button class="btn-ghost" onclick="showLogin()">← Back to Login</button>
-      <p class="msg" id="r-msg"></p>
+      <p class="msg" id="r-msg" role="status" aria-live="polite"></p>
     </div>
+
+    <div id="verify-status-section" class="form-section" style="display:none; text-align:center;" role="region" aria-live="polite" aria-label="Email Verification Status">
+      <div id="verify-icon" style="font-size:2.5rem; margin-bottom:8px;" aria-hidden="true">⏳</div>
+      <h3 id="verify-title" style="margin:0 0 8px; font-size:1.15rem; color:#fff;">Verifying Email...</h3>
+      <p id="verify-desc" style="font-size:0.88rem; color:var(--text-secondary); margin:0 0 16px; line-height:1.4;"></p>
+      <div id="verify-actions" style="display:flex; flex-direction:column; gap:10px;">
+        <button class="btn-primary" id="verify-action-btn" onclick="showLogin()" style="display:none;">Continue to Login</button>
+        <button class="btn-ghost" id="verify-resend-btn" onclick="showResendVerification()" style="display:none;">Request New Verification Link</button>
+      </div>
+    </div>
+
+    <div id="resend-form" class="form-section" style="display:none" role="form" aria-label="Resend Verification Form">
+      <h3 style="margin:0 0 4px; font-size:1.1rem; color:#fff; text-align:center;">Resend Verification Link</h3>
+      <p class="sub" style="margin-bottom:8px;">Enter your registered email or username</p>
+      <div class="form-group">
+        <label for="resend-input" class="input-label">Email or Username</label>
+        <input id="resend-input" type="text" placeholder="name@example.com or username" autocomplete="username" aria-required="true" aria-describedby="resend-msg"/>
+      </div>
+      <button class="btn-primary" id="resend-submit-btn" onclick="resendVerification()">Send Verification Email</button>
+      <button class="btn-ghost" onclick="showLogin()">← Back to Login</button>
+      <p class="msg" id="resend-msg" role="status" aria-live="polite"></p>
+    </div>
+
+    <footer class="auth-footer" role="contentinfo">
+      <p>&copy; 2026 GeoGuesser. All rights reserved. · <a href="privacy.html" class="footer-link">Privacy Policy</a></p>
+    </footer>
   </div>
 </div>
 
 <!-- ── GAME SCREEN ─────────────────────────────────── -->
 <div id="game-screen" class="screen" style="display:none; flex-direction:column;">
 
-  <nav>
-    <span class="brand">🌍 GeoGuesser</span>
-    <div class="nav-center">
-      <span class="timer-badge">⏱ <span id="timer">0s</span></span>
-      <span class="round-badge">Round <span id="round-num">1</span> / 5</span>
-      <span class="score-badge">Score: <span id="running-score">0</span></span>
+  <nav role="navigation" aria-label="Game navigation">
+    <a href="#" class="brand brand-link" onclick="handleBrandClick(event)" aria-label="GeoGuesser Home">🌍 GeoGuesser</a>
+    <div class="nav-center" role="region" aria-label="Game progress summary">
+      <span class="timer-badge" title="Time elapsed in current round">⏱ <span id="timer">0s</span></span>
+      <span class="round-badge" title="Current round out of five">Round <span id="round-num">1</span> / 5</span>
+      <span class="score-badge" title="Accumulated score across all rounds">Score: <span id="running-score">0</span></span>
     </div>
-    <div class="nav-actions">
-      <button class="btn-sm" onclick="showHistory()">📜 History</button>
-      <button class="btn-sm" onclick="showLeaderboard()">🏆 Leaderboard</button>
-      <button class="btn-sm btn-logout" onclick="logout()">Logout</button>
+    <div class="nav-actions" role="toolbar" aria-label="Navigation actions">
+      <button class="btn-sm" onclick="showHistory()" title="View your past game history" aria-label="Game history">📜 <span class="nav-btn-text">History</span></button>
+      <button class="btn-sm" onclick="showLeaderboard()" title="View global rankings" aria-label="Global leaderboard">🏆 <span class="nav-btn-text">Leaderboard</span></button>
+      <button class="btn-sm btn-logout" onclick="logout()" title="Log out of session" aria-label="Log out">🚪 <span class="nav-btn-text">Logout</span></button>
     </div>
   </nav>
 
-  <div class="game-body">
+  <main id="main-stage" class="game-body" role="main">
 
     <div class="game-stage">
-        <div class="image-panel">
-            <div id="img-loader" class="loader-overlay">
-                <div class="spinner"></div>
+        <div class="image-panel" role="region" aria-label="Satellite Imagery Display">
+            <div id="img-loader" class="loader-overlay" role="status" aria-live="polite">
+                <div class="spinner" aria-hidden="true"></div>
                 <span>Loading location...</span>
             </div>
-            <img id="location-img" src="" alt="Guess this location" style="display:none"/>
+            <img id="location-img" src="" alt="High-resolution satellite view of mystery location" style="display:none"/>
+            <div class="satellite-attribution">&copy; Mapbox &copy; OpenStreetMap</div>
 
-            <div id="result-ribbon" style="display:none">
+            <div id="result-ribbon" style="display:none" role="region" aria-live="polite" aria-label="Round Result Summary">
                 <span id="result-label"></span>
-                <span class="ribbon-sep">·</span>
+                <span class="ribbon-sep" aria-hidden="true">·</span>
                 <b id="result-place"></b>
-                <span class="ribbon-sep">·</span>
+                <span class="ribbon-sep" aria-hidden="true">·</span>
                 <span class="ribbon-dist">📏 <b id="result-dist"></b></span>
-                <span class="ribbon-sep">·</span>
+                <span class="ribbon-sep" aria-hidden="true">·</span>
                 <span class="ribbon-score">⭐ <b id="result-score"></b></span>
             </div>
 
             <!-- Floating Minimap -->
-            <div id="floating-map" class="floating-map" aria-label="World Minimap">
+            <div id="floating-map" class="floating-map" role="region" aria-label="World Minimap. Click to place your guess marker.">
                 <div class="map-toolbar">
-                    <span class="map-title"><span class="map-icon">🗺️</span> World Map</span>
+                    <span class="map-title"><span class="map-icon" aria-hidden="true">🗺️</span> World Map</span>
                     <button type="button" id="map-expand-btn" class="map-toggle-btn" title="Toggle map size" aria-label="Toggle map size">
-                        <svg class="icon-expand" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
-                        <svg class="icon-collapse" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="10" y1="14" x2="3" y2="21"></line></svg>
+                        <svg class="icon-expand" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                        <svg class="icon-collapse" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="10" y1="14" x2="3" y2="21"></line></svg>
                     </button>
                 </div>
-                <div id="world-map"></div>
+                <div id="world-map" tabindex="0" role="application" aria-label="Interactive leaflet world map"></div>
             </div>
         </div>
     </div><!-- end game-stage -->
 
-    <div class="action-bar">
-        <div id="pin-hint" class="hint-badge">📍 Click on the map to place your guess</div>
+    <div class="action-bar" role="toolbar" aria-label="Guess controls">
+        <div id="pin-hint" class="hint-badge" role="status" aria-live="polite">📍 Click on the map to place your guess</div>
         <div class="action-buttons">
-            <button class="btn-primary guess-btn" id="guess-btn" onclick="submitGuess()" disabled>
+            <button class="btn-primary guess-btn" id="guess-btn" onclick="submitGuess()" disabled aria-label="Submit your location guess">
                 Submit Guess
             </button>
-            <button class="btn-ghost next-btn" id="next-btn" onclick="nextRound()" style="display:none">
+            <button class="btn-ghost next-btn" id="next-btn" onclick="nextRound()" style="display:none" aria-label="Advance to next location round">
                 Next Location →
             </button>
         </div>
     </div>
 
-  </div>
+  </main>
 
-  <div id="final-overlay" style="display:none">
+  <div id="final-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="final-title">
     <div class="final-card">
-      <div class="final-emoji">🎉</div>
-      <h2>Game Over!</h2>
+      <div class="final-emoji" aria-hidden="true">🎉</div>
+      <h2 id="final-title">Game Over!</h2>
       <div class="final-score"><span id="final-score-val">0</span> / 25,000</div>
       <div id="final-grade"></div>
       <button class="btn-primary" style="width:200px" onclick="startGame()">Play Again</button>
@@ -122,19 +199,34 @@
 
 <!-- ── LEADERBOARD ──────────────────────────────────── -->
 <div id="lb-screen" class="screen center" style="display:none">
-  <div class="card" style="width:620px">
+  <div class="card lb-card" role="region" aria-label="Global Leaderboard">
     <h2>🏆 Global Leaderboard</h2>
-    <table id="lb-table">
-      <thead><tr><th>#</th><th>Player</th><th>Total Score</th><th>Best</th><th>Games</th></tr></thead>
-      <tbody id="lb-body"></tbody>
-    </table>
-    <button class="btn-ghost" style="margin-top:20px" onclick="showGame()">← Back</button>
+    <div class="table-responsive">
+      <table id="lb-table" aria-label="Player rankings">
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Player</th>
+            <th scope="col">Total Score</th>
+            <th scope="col">Best</th>
+            <th scope="col">Games</th>
+          </tr>
+        </thead>
+        <tbody id="lb-body"></tbody>
+      </table>
+    </div>
+    <div class="card-actions">
+      <button class="btn-ghost" onclick="showGame()" aria-label="Return to game">← Back to Game</button>
+    </div>
+    <footer class="card-footer" role="contentinfo">
+      <p>&copy; 2026 GeoGuesser. All rights reserved. · <a href="privacy.html" class="footer-link">Privacy Policy</a></p>
+    </footer>
   </div>
 </div>
 
 <!-- ── GAME HISTORY ─────────────────────────────────── -->
 <div id="history-screen" class="screen center" style="display:none">
-  <div class="card history-card">
+  <div class="card history-card" role="region" aria-label="Recent Game History">
 
     <div class="history-header">
       <div>
@@ -143,16 +235,16 @@
       </div>
     </div>
 
-    <div class="history-table-wrapper">
-      <table id="history-table">
+    <div class="history-table-wrapper table-responsive" tabindex="0" role="region" aria-label="Game history table, scroll horizontally for more details">
+      <table id="history-table" aria-label="Recent game records">
         <thead>
           <tr>
-            <th>#</th>
-            <th>Location</th>
-            <th>Score</th>
-            <th>Distance</th>
-            <th>Time</th>
-            <th>Played At</th>
+            <th scope="col">#</th>
+            <th scope="col">Location</th>
+            <th scope="col">Score</th>
+            <th scope="col">Distance</th>
+            <th scope="col">Time</th>
+            <th scope="col">Played At</th>
           </tr>
         </thead>
 
@@ -166,9 +258,15 @@
       </table>
     </div>
 
-    <button class="btn-ghost" style="margin-top:20px" onclick="showGame()">
-      ← Back to Game
-    </button>
+    <div class="card-actions">
+      <button class="btn-ghost" onclick="showGame()" aria-label="Return to game">
+        ← Back to Game
+      </button>
+    </div>
+
+    <footer class="card-footer" role="contentinfo">
+      <p>&copy; 2026 GeoGuesser. All rights reserved. · <a href="privacy.html" class="footer-link">Privacy Policy</a></p>
+    </footer>
 
   </div>
 </div>

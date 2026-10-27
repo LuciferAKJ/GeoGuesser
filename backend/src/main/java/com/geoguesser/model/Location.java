@@ -47,16 +47,28 @@ public class Location {
     @Column(name = "times_played")
     private Integer timesPlayed = 0;
 
+    @Column(name = "zoom")
+    private Integer zoom = 13;
+
     public enum Difficulty {
         EASY, MEDIUM, HARD
     }
 
     public Location(Double lat, Double lon, String country, String city, String imageUrl, Difficulty difficulty) {
+        this(lat, lon, country, city, imageUrl, difficulty, 13);
+    }
+
+    public Location(Double lat, Double lon, String country, String city, String imageUrl, Difficulty difficulty, Integer zoom) {
         this.latitude = lat;
         this.longitude = lon;
         this.country = country;
         this.city = city;
         this.imageUrl = imageUrl;
         this.difficulty = difficulty;
+        this.zoom = (zoom != null && zoom >= 1 && zoom <= 20) ? zoom : 13;
+    }
+
+    public Integer getZoom() {
+        return zoom != null ? zoom : 13;
     }
 }
