@@ -12,12 +12,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -72,5 +75,23 @@ class LocationControllerTest {
                 .andExpect(jsonPath("$[0].id", is(3)));
 
         verify(locationService).getRandomLocationsWithExclusions(5, List.of(1L, 2L));
+    }
+
+    @Test
+    @DisplayName("Controller exposes no write endpoints")
+    void controllerHasNoWriteEndpoints() {
+        List<String> writeMethods = Arrays.stream(LocationController.class.getDeclaredMethods())
+                .filter(LocationControllerTest::isWriteMapping)
+                .map(Method::getName)
+                .toList();
+
+        assertTrue(writeMethods.isEmpty(), "Unexpected write endpoints: " + writeMethods);
+    }
+
+    private static boolean isWriteMapping(Method method) {
+        return method.isAnnotationPresent(org.springframework.web.bind.annotation.PostMapping.class)
+                || method.isAnnotationPresent(org.springframework.web.bind.annotation.PutMapping.class)
+                || method.isAnnotationPresent(org.springframework.web.bind.annotation.PatchMapping.class)
+                || method.isAnnotationPresent(org.springframework.web.bind.annotation.DeleteMapping.class);
     }
 }

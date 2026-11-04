@@ -1,6 +1,5 @@
 package com.geoguesser.controller;
 
-import com.geoguesser.model.Location;
 import com.geoguesser.service.LocationService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -66,8 +65,4 @@ public class LocationController {
         return ResponseEntity.ok(locations);
     }
 
-    @PostMapping
-    public ResponseEntity<Location> addLocation(@RequestBody Location location) {
-        return ResponseEntity.ok(locationService.save(location));
-    }
 }
