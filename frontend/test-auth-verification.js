@@ -246,4 +246,86 @@ assert.strictEqual(validResend.payload.emailOrUsername, 'player@example.com');
 assert.strictEqual(Object.keys(validResend.payload)[0], 'emailOrUsername', 'Must use emailOrUsername key matching backend DTO');
 console.log('✅ 6. Resend form input validation and payload test passed\n');
 
+
+// 7. Actual Production Password Visibility Toggle Functionality & Accessibility
+// Ensure minimal DOM globals exist for app.js
+if (!global.document) {
+  global.document = {
+    getElementById: (id) => dom.getElementById(id),
+    title: ''
+  };
+} else {
+  const origGetElementById = global.document.getElementById;
+  global.document.getElementById = (id) => dom.getElementById(id) || (origGetElementById && origGetElementById(id));
+}
+if (!global.window) {
+  global.window = { matchMedia: () => ({ matches: false }), location: { hash: '', search: '', pathname: '/' } };
+}
+if (!global.localStorage) {
+  global.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {}, clear: () => {} };
+}
+if (!global.sessionStorage) {
+  global.sessionStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {}, clear: () => {} };
+}
+
+const { togglePasswordVisibility } = require('./app.js');
+
+(function testActualPasswordToggle() {
+  const inputEl = dom.registerElement('l-pass');
+  inputEl.setAttribute = function(k, v) { this[k] = v; };
+  inputEl.getAttribute = function(k) { return this[k] || null; };
+  inputEl.setAttribute('type', 'password');
+  inputEl.value = 'SuperSecret123!';
+
+  const eyeShow = { style: { display: 'block' } };
+  const eyeHide = { style: { display: 'none' } };
+
+  const mockBtn = {
+    attributes: {
+      'aria-pressed': 'false',
+      'aria-label': 'Show password',
+      'aria-controls': 'l-pass'
+    },
+    title: 'Show password',
+    getAttribute(name) { return this.attributes[name]; },
+    setAttribute(name, val) { this.attributes[name] = val; },
+    querySelector(selector) {
+      if (selector === '.eye-show') return eyeShow;
+      if (selector === '.eye-hide') return eyeHide;
+      return null;
+    }
+  };
+
+  // Initial state check
+  assert.strictEqual(inputEl.getAttribute('type'), 'password');
+  assert.strictEqual(inputEl.value, 'SuperSecret123!');
+  assert.strictEqual(mockBtn.getAttribute('aria-pressed'), 'false');
+  assert.strictEqual(mockBtn.getAttribute('aria-label'), 'Show password');
+  assert.strictEqual(eyeShow.style.display, 'block');
+  assert.strictEqual(eyeHide.style.display, 'none');
+
+  // Toggle 1: Show password using ACTUAL production function
+  togglePasswordVisibility('l-pass', mockBtn);
+
+  assert.strictEqual(inputEl.getAttribute('type'), 'text', 'Input type must be changed to text');
+  assert.strictEqual(inputEl.value, 'SuperSecret123!', 'Input value must remain completely unchanged');
+  assert.strictEqual(mockBtn.getAttribute('aria-pressed'), 'true', 'aria-pressed must be true when visible');
+  assert.strictEqual(mockBtn.getAttribute('aria-label'), 'Hide password', 'aria-label must update to Hide password');
+  assert.strictEqual(mockBtn.title, 'Hide password', 'title must update to Hide password');
+  assert.strictEqual(eyeShow.style.display, 'none', 'eye-show icon must be hidden');
+  assert.strictEqual(eyeHide.style.display, 'block', 'eye-hide icon must be visible');
+
+  // Toggle 2: Hide password using ACTUAL production function
+  togglePasswordVisibility('l-pass', mockBtn);
+
+  assert.strictEqual(inputEl.getAttribute('type'), 'password', 'Input type must revert to password');
+  assert.strictEqual(inputEl.value, 'SuperSecret123!', 'Input value must remain intact after second toggle');
+  assert.strictEqual(mockBtn.getAttribute('aria-pressed'), 'false', 'aria-pressed must be false when hidden');
+  assert.strictEqual(mockBtn.getAttribute('aria-label'), 'Show password', 'aria-label must update to Show password');
+  assert.strictEqual(mockBtn.title, 'Show password', 'title must update to Show password');
+  assert.strictEqual(eyeShow.style.display, 'block', 'eye-show icon must be restored');
+  assert.strictEqual(eyeHide.style.display, 'none', 'eye-hide icon must be hidden');
+
+  console.log('✅ 7. Actual production togglePasswordVisibility preserves value and updates accessibility passed\n');
+})();
 console.log('🎉 ALL FRONTEND AUTH & VERIFICATION TESTS PASSED!');

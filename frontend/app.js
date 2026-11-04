@@ -135,6 +135,27 @@ async function loadHistory() {
   }
 }
 
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input || !btn) return;
+
+  const isPassword = input.getAttribute('type') === 'password';
+  const newType = isPassword ? 'text' : 'password';
+  input.setAttribute('type', newType);
+
+  btn.setAttribute('aria-pressed', isPassword ? 'true' : 'false');
+  const labelText = isPassword ? 'Hide password' : 'Show password';
+  btn.setAttribute('aria-label', labelText);
+  btn.title = labelText;
+
+  const showIcon = btn.querySelector('.eye-show');
+  const hideIcon = btn.querySelector('.eye-hide');
+  if (showIcon && hideIcon) {
+    showIcon.style.display = isPassword ? 'none' : 'block';
+    hideIcon.style.display = isPassword ? 'block' : 'none';
+  }
+}
+
 function escapeHtml(value) {
     return String(value)
         .replace(/&/g, '&amp;')
@@ -147,13 +168,13 @@ function escapeHtml(value) {
 // ── CONFIG ────────────────────────────────────────────────
 const API = (typeof window !== 'undefined' && window.ENV && window.ENV.API_URL && window.ENV.API_URL.trim() !== '')
   ? window.ENV.API_URL.trim()
-  : ((typeof localStorage !== 'undefined' && localStorage.getItem('GEOGUESSER_API_URL'))
+  : ((typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function' && localStorage.getItem('GEOGUESSER_API_URL'))
      || 'http://localhost:8080/api');
 
 // ── STATE ─────────────────────────────────────────────────
-let token      = localStorage.getItem('token');
-let playerId   = localStorage.getItem('playerId');
-let username   = localStorage.getItem('username');
+let token      = (typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function') ? localStorage.getItem('token') : null;
+let playerId   = (typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function') ? localStorage.getItem('playerId') : null;
+let username   = (typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function') ? localStorage.getItem('username') : null;
 
 let map;
 let guessMarker;
@@ -181,6 +202,11 @@ let resizeRafId = null;
 let isSubmittingLogin = false;
 let isSubmittingRegister = false;
 let isSubmittingResend = false;
+let isTransitioningRound = false;
+let isStartingGame = false;
+let mapUiInitialized = false;
+let lastExpandToggleTime = 0;
+let cachedCountryData = null;
 let resendCooldownInterval = null;
 let resendCooldownRemaining = 0;
 
@@ -340,6 +366,13 @@ function showGame() {
   document.title = `GeoGuesser — Round ${roundNum} of ${TOTAL_ROUNDS}`;
   show('game-screen');
   initMap();
+  if (map) {
+    requestAnimationFrame(() => {
+      if (map) {
+        map.invalidateSize({ pan: false });
+      }
+    });
+  }
 }
 
 function showLeaderboard() {
@@ -416,7 +449,13 @@ function mapClickHandler(e) {
 }
 
 function initMap() {
-  if (map) return;
+  if (map) {
+    map.invalidateSize({ pan: false });
+    return;
+  }
+
+  const mapEl = document.getElementById('world-map');
+  if (!mapEl) return;
 
   map = L.map('world-map', {
     center: [20, 0],
@@ -437,6 +476,20 @@ function initMap() {
     attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
     maxZoom: 16
   }).addTo(map);
+
+  map.on('dragstart', () => {
+    if (resizeRafId) {
+      cancelAnimationFrame(resizeRafId);
+      resizeRafId = null;
+    }
+  });
+
+  map.on('zoomstart', () => {
+    if (resizeRafId) {
+      cancelAnimationFrame(resizeRafId);
+      resizeRafId = null;
+    }
+  });
 
   L.control.attribution({
     position: 'bottomleft',
@@ -522,13 +575,19 @@ function initMap() {
     countryLabelLayer = L.layerGroup(markers, { pane: 'tooltipPane' }).addTo(map);
   }
 
-  fetch('countries.json')
-    .then(response => response.json())
-    .then(data => {
-      countryData = data;
-      updateCountryLabels();
-    })
-    .catch(err => console.warn('Country labels not loaded:', err));
+  if (cachedCountryData) {
+    countryData = cachedCountryData;
+    updateCountryLabels();
+  } else {
+    fetch('countries.json')
+      .then(response => response.json())
+      .then(data => {
+        cachedCountryData = data;
+        countryData = data;
+        updateCountryLabels();
+      })
+      .catch(err => console.warn('Country labels not loaded:', err));
+  }
 
   map.on('zoomend', updateCountryLabels);
   map.on('moveend', updateCountryLabels);
@@ -547,15 +606,22 @@ function initMap() {
       resizeRafId = null;
     }
 
+    const mapContainerEl = document.getElementById('floating-map');
+    if (!mapContainerEl || mapContainerEl.clientWidth === 0 || mapContainerEl.clientHeight === 0) {
+      return;
+    }
+
     const centerToPreserve = targetCenter
       || (guessMarker ? guessMarker.getLatLng() : map.getCenter());
+
+    if (!centerToPreserve || isNaN(centerToPreserve.lat) || isNaN(centerToPreserve.lng)) {
+      return;
+    }
 
     const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) {
       map.invalidateSize({ pan: false });
-      if (centerToPreserve) {
-        map.panTo(centerToPreserve, { animate: false });
-      }
+      map.panTo(centerToPreserve, { animate: false });
       updateCountryLabels();
       return;
     }
@@ -590,6 +656,12 @@ function initMap() {
       e.preventDefault();
       e.stopPropagation();
     }
+    const now = Date.now();
+    if (now - lastExpandToggleTime < 300) {
+      return;
+    }
+    lastExpandToggleTime = now;
+
     if (hoverIntentTimer) {
       clearTimeout(hoverIntentTimer);
       hoverIntentTimer = null;
@@ -617,77 +689,82 @@ function initMap() {
     startSmoothResize();
   }
 
-  if (expandBtn) {
-    expandBtn.addEventListener('click', toggleMapExpand);
-    expandBtn.addEventListener('touchend', toggleMapExpand);
-  }
+  if (!mapUiInitialized) {
+    mapUiInitialized = true;
 
-  // Smooth hover intent on desktop
-  if (window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
-    mapContainer.addEventListener('mouseenter', () => {
-      if (collapseTimer) {
-        clearTimeout(collapseTimer);
-        collapseTimer = null;
-      }
-      if (isPinnedExpanded || mapContainer.classList.contains('expanded')) {
-        return;
-      }
-      hoverIntentTimer = setTimeout(() => {
-        hoverIntentTimer = null;
-        if (!isPinnedExpanded) {
-          mapContainer.classList.add('hovered');
-          startSmoothResize();
+    if (expandBtn) {
+      expandBtn.addEventListener('click', toggleMapExpand);
+      expandBtn.addEventListener('touchend', toggleMapExpand);
+    }
+
+    // Smooth hover intent on desktop
+    if (window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+      mapContainer.addEventListener('mouseenter', () => {
+        if (collapseTimer) {
+          clearTimeout(collapseTimer);
+          collapseTimer = null;
         }
-      }, HOVER_INTENT_DELAY);
-    });
-
-    mapContainer.addEventListener('mouseleave', () => {
-      if (hoverIntentTimer) {
-        clearTimeout(hoverIntentTimer);
-        hoverIntentTimer = null;
-      }
-      // Never collapse unexpectedly if pinned, if a guess pin has been placed, or if viewing results
-      if (isPinnedExpanded || guessMarker !== null || isResultState) {
-        return;
-      }
-      collapseTimer = setTimeout(() => {
-        collapseTimer = null;
-        if (!isPinnedExpanded && guessMarker === null && !isResultState) {
-          mapContainer.classList.remove('hovered');
-          startSmoothResize();
+        if (isPinnedExpanded || mapContainer.classList.contains('expanded')) {
+          return;
         }
-      }, COLLAPSE_DELAY);
-    });
-  }
+        hoverIntentTimer = setTimeout(() => {
+          hoverIntentTimer = null;
+          if (!isPinnedExpanded) {
+            mapContainer.classList.add('hovered');
+            startSmoothResize();
+          }
+        }, HOVER_INTENT_DELAY);
+      });
 
-  // ResizeObserver fallback to keep Leaflet synchronized with container changes
-  if (typeof ResizeObserver !== 'undefined') {
-    let lastW = mapContainer.clientWidth;
-    let lastH = mapContainer.clientHeight;
-    const ro = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        if (Math.abs(width - lastW) > 1 || Math.abs(height - lastH) > 1) {
-          lastW = width;
-          lastH = height;
-          if (!resizeRafId && map) {
-            map.invalidateSize({ pan: false });
-            updateCountryLabels();
+      mapContainer.addEventListener('mouseleave', () => {
+        if (hoverIntentTimer) {
+          clearTimeout(hoverIntentTimer);
+          hoverIntentTimer = null;
+        }
+        // Never collapse unexpectedly if pinned, if a guess pin has been placed, or if viewing results
+        if (isPinnedExpanded || guessMarker !== null || isResultState) {
+          return;
+        }
+        collapseTimer = setTimeout(() => {
+          collapseTimer = null;
+          if (!isPinnedExpanded && guessMarker === null && !isResultState) {
+            mapContainer.classList.remove('hovered');
+            startSmoothResize();
+          }
+        }, COLLAPSE_DELAY);
+      });
+    }
+
+    // ResizeObserver fallback to keep Leaflet synchronized with container changes
+    if (typeof ResizeObserver !== 'undefined') {
+      let lastW = mapContainer.clientWidth;
+      let lastH = mapContainer.clientHeight;
+      const ro = new ResizeObserver(entries => {
+        for (const entry of entries) {
+          const { width, height } = entry.contentRect;
+          if (width === 0 || height === 0) continue;
+          if (Math.abs(width - lastW) > 1 || Math.abs(height - lastH) > 1) {
+            lastW = width;
+            lastH = height;
+            if (!resizeRafId && map) {
+              map.invalidateSize({ pan: false });
+              updateCountryLabels();
+            }
           }
         }
+      });
+      ro.observe(mapContainer);
+    }
+
+    mapContainer.addEventListener('transitionend', (e) => {
+      if (e.propertyName === 'width' || e.propertyName === 'height') {
+        if (map && mapContainer.clientWidth > 0 && mapContainer.clientHeight > 0) {
+          map.invalidateSize({ pan: false });
+          updateCountryLabels();
+        }
       }
     });
-    ro.observe(mapContainer);
   }
-
-  mapContainer.addEventListener('transitionend', (e) => {
-    if (e.propertyName === 'width' || e.propertyName === 'height') {
-      if (map) {
-        map.invalidateSize({ pan: false });
-        updateCountryLabels();
-      }
-    }
-  });
 
   map.on('click', mapClickHandler);
 }
@@ -914,6 +991,8 @@ function logout() {
   }
   isPinnedExpanded = false;
   isResultState = false;
+  isTransitioningRound = false;
+  isStartingGame = false;
 
   if (map) {
     map.remove();
@@ -971,6 +1050,9 @@ function recordRecentLocationIds(ids) {
 
 // ── GAME ──────────────────────────────────────────────────
 async function startGame() {
+  if (isStartingGame) return;
+  isStartingGame = true;
+
   roundNum = 1;
   runningScore = 0;
   roundLocations = [];
@@ -995,7 +1077,10 @@ async function startGame() {
 
     await loadRound();
   } catch (e) {
-    document.getElementById('img-loader').textContent = 'Failed to load locations: ' + e.message;
+    const loader = document.getElementById('img-loader');
+    if (loader) loader.textContent = 'Failed to load locations: ' + e.message;
+  } finally {
+    isStartingGame = false;
   }
 }
 
@@ -1004,11 +1089,44 @@ async function loadRound() {
   isSubmittingGuess = false;
   isResultState = false;
 
+  if (resizeRafId) {
+    cancelAnimationFrame(resizeRafId);
+    resizeRafId = null;
+  }
+
+  if (hoverIntentTimer) {
+    clearTimeout(hoverIntentTimer);
+    hoverIntentTimer = null;
+  }
+  if (collapseTimer) {
+    clearTimeout(collapseTimer);
+    collapseTimer = null;
+  }
+
+  if (map) {
+    if (typeof map.stop === 'function') {
+      map.stop();
+    }
+    if (guessMarker) {
+      map.removeLayer(guessMarker);
+      guessMarker = null;
+    }
+    if (actualMarker) {
+      map.removeLayer(actualMarker);
+      actualMarker = null;
+    }
+    if (distanceLine) {
+      map.removeLayer(distanceLine);
+      distanceLine = null;
+    }
+    map.setView([20, 0], 2, { animate: false });
+  }
+
   const mapContainer = document.getElementById('floating-map');
   if (mapContainer && !isPinnedExpanded) {
     mapContainer.classList.remove('expanded', 'hovered');
-    if (typeof startSmoothResize === 'function') {
-      startSmoothResize();
+    if (typeof startSmoothResize === 'function' && typeof L !== 'undefined' && L.latLng) {
+      startSmoothResize(L.latLng(20, 0));
     }
   }
 
@@ -1019,26 +1137,14 @@ async function loadRound() {
 
   document.getElementById('round-num').textContent = roundNum;
   document.getElementById('pin-hint').textContent = '📍 Click on map to place guess';
-  document.getElementById('img-loader').style.display = 'flex';
-  document.getElementById('location-img').style.display = 'none';
-
-  if (guessMarker) {
-    map.removeLayer(guessMarker);
-    guessMarker = null;
+  const imgLoader = document.getElementById('img-loader');
+  if (imgLoader) {
+    imgLoader.style.display = 'flex';
+    imgLoader.innerHTML = '<div class="spinner" aria-hidden="true"></div><span>Loading satellite imagery...</span>';
   }
-
-  if (actualMarker) {
-    map.removeLayer(actualMarker);
-    actualMarker = null;
-  }
-
-  if (distanceLine) {
-    map.removeLayer(distanceLine);
-    distanceLine = null;
-  }
-
-  if (map) {
-    map.setView([20, 0], 2);
+  const imgEl = document.getElementById('location-img');
+  if (imgEl) {
+    imgEl.style.display = 'none';
   }
 
   stopTimer();
@@ -1079,7 +1185,8 @@ async function loadRound() {
 
     img.src = data.imageUrl;
   } catch (e) {
-    document.getElementById('img-loader').textContent = e.message;
+    const loader = document.getElementById('img-loader');
+    if (loader) loader.textContent = e.message;
   }
 }
 
@@ -1261,9 +1368,20 @@ async function submitGuess() {
   }
 }
 
-function nextRound() {
-  roundNum++;
-  loadRound();
+async function nextRound() {
+  if (isTransitioningRound || roundNum >= TOTAL_ROUNDS) return;
+
+  const nextBtn = document.getElementById('next-btn');
+  if (nextBtn) nextBtn.disabled = true;
+  isTransitioningRound = true;
+
+  try {
+    roundNum++;
+    await loadRound();
+  } finally {
+    isTransitioningRound = false;
+    if (nextBtn) nextBtn.disabled = false;
+  }
 }
 
 function showFinal() {
@@ -1293,17 +1411,23 @@ function showFinal() {
 
 // ── TIMER ─────────────────────────────────────────────────
 function startTimer() {
+  stopTimer();
   elapsedSeconds = 0;
 
   timerInterval = setInterval(() => {
     elapsedSeconds++;
-    document.getElementById('timer').textContent =
-      elapsedSeconds + 's';
+    const timerEl = document.getElementById('timer');
+    if (timerEl) {
+      timerEl.textContent = elapsedSeconds + 's';
+    }
   }, 1000);
 }
 
 function stopTimer() {
-  clearInterval(timerInterval);
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
 }
 
 // ── API ───────────────────────────────────────────────────
@@ -1368,4 +1492,47 @@ function msg(id, text, color) {
       : color === 'green'
       ? '#4caf50'
       : '#aaa';
+}
+
+// ── EXPORTS FOR TESTING (NODE ENVIRONMENT) ────────────────
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    togglePasswordVisibility,
+    nextRound,
+    loadRound,
+    startGame,
+    submitGuess,
+    initMap,
+    startTimer,
+    stopTimer,
+    showGame,
+    logout,
+    _getInternalState: () => ({
+      get roundNum() { return roundNum; },
+      set roundNum(v) { roundNum = v; },
+      get isTransitioningRound() { return isTransitioningRound; },
+      set isTransitioningRound(v) { isTransitioningRound = v; },
+      get canGuess() { return canGuess; },
+      set canGuess(v) { canGuess = v; },
+      get isResultState() { return isResultState; },
+      set isResultState(v) { isResultState = v; },
+      get map() { return map; },
+      set map(v) { map = v; },
+      get guessMarker() { return guessMarker; },
+      set guessMarker(v) { guessMarker = v; },
+      get actualMarker() { return actualMarker; },
+      set actualMarker(v) { actualMarker = v; },
+      get distanceLine() { return distanceLine; },
+      set distanceLine(v) { distanceLine = v; },
+      get roundLocations() { return roundLocations; },
+      set roundLocations(v) { roundLocations = v; },
+      get TOTAL_ROUNDS() { return TOTAL_ROUNDS; },
+      get resizeRafId() { return resizeRafId; },
+      set resizeRafId(v) { resizeRafId = v; },
+      get startSmoothResize() { return startSmoothResize; },
+      set startSmoothResize(v) { startSmoothResize = v; },
+      get mapUiInitialized() { return mapUiInitialized; },
+      set mapUiInitialized(v) { mapUiInitialized = v; }
+    })
+  };
 }
